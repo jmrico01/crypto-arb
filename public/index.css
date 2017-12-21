@@ -1,0 +1,53 @@
+#topBar {
+    width: 100%;
+    height: 120px;
+
+    text-align: center;
+}
+#bar1 {
+    float: left;
+    width: 30%;
+    height: 100%;
+}
+#bar2 {
+    float: left;
+    width: 40%;
+    height: 100%;
+}
+#bar3 {
+    float: left;
+    width: 30%;
+    height: 100%;
+}
+
+.textLine {
+    font-size: 16pt;
+}
+#site, #currencyPair, #minAsk, #maxBid {
+    font-weight: bold;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+}
+
+.lineBlue {
+    fill: none;
+    stroke: blue;
+    stroke-width: 2px;
+}
+.lineRed {
+    fill: none;
+    stroke: red;
+    stroke-width: 2px;
+}
+
+.tick text {
+    font-size: 12px;
+}
+
+.tick line {
+    opacity: 0.2;
+}

@@ -1,0 +1,44 @@
+<html>
+    <head>
+        <title>
+            Crypto-Arbitrage
+        </title>
+        <meta charset="utf-8">
+
+        <link rel="stylesheet" type="text/css" href="index.css">
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script src="http://d3js.org/d3.v3.min.js"></script>
+
+        <script src="index.js"></script>
+    </head>
+    <body>
+        <div id="topBar">
+            <div id="bar1">
+                <div class="textLine">
+                    Exchange Site:
+                    <div id="site">?</div>
+                </div>
+                <div class="textLine">
+                    Currencies:
+                    <div id="currencyPair">?</div>
+                </div>
+            </div>
+            <div id="bar2">
+                Incoming: switch currencies and sites
+            </div>
+            <div id="bar3">
+                <div class="textLine">
+                    Min ask:
+                    <br>
+                    <span id="minAsk">?</span> (-<span id="minAskAge">?</span>s) 
+                </div>
+                <div class="textLine">
+                    Max bid:
+                    <br>
+                    <span id="maxBid">?</span> (-<span id="maxBidAge">?</span>s)
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
