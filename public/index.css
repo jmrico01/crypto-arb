@@ -23,6 +23,14 @@
 .textLine {
     font-size: 16pt;
 }
+#minAskText {
+    font-weight: bold;
+    color: #7a0707;
+}
+#maxBidText {
+    font-weight: bold;
+    color: #137a13;
+}
 #site, #currencyPair, #minAsk, #maxBid {
     font-weight: bold;
 }
@@ -33,14 +41,14 @@
     stroke: black;
 }
 
-.lineBlue {
-    fill: none;
-    stroke: blue;
-    stroke-width: 2px;
-}
 .lineRed {
     fill: none;
-    stroke: red;
+    stroke: #7a0707;
+    stroke-width: 2px;
+}
+.lineGreen {
+    fill: none;
+    stroke: #137a13;
     stroke-width: 2px;
 }
 

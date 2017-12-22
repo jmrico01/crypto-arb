@@ -72,18 +72,28 @@ function Plot(datasets, xMin, xMax)
         .attr("class", "y axis")
         .call(yAxis)
 
-        svg.append("path")
+    // Asks
+    svg.append("path")
         .data([datasets[0]])
-        .attr("class", "lineBlue")
+        .attr("class", "lineRed")
         .attr("d", line);
-        svg.append("path")
-            .data([datasets[1]])
-            .attr("class", "lineRed")
-            .attr("d", line);
+    // Bids
+    svg.append("path")
+        .data([datasets[1]])
+        .attr("class", "lineGreen")
+        .attr("d", line);
 }
 
 function SetAskBidDisplay(depth)
 {
+    if (depth === null) {
+        $("#minAsk").html("N/A");
+        $("#maxBid").html("N/A");
+        $("#minAskAge").html("0");
+        $("#maxBidAge").html("0");
+        return;
+    }
+    
     var minAskInd = 0;
     var maxBidInd = depth.bids.length - 1;
     $("#minAsk").html(depth.asks[minAskInd][0]);
@@ -99,9 +109,14 @@ function SetAskBidDisplay(depth)
 
 function ProcessDepthData(depth)
 {
+    if (depth.asks.length === 0 || depth.bids.length === 0) {
+        SetAskBidDisplay(null);
+        return;
+    }
+
     SetAskBidDisplay(depth);
 
-    var depthMargin = 0.05;
+    var depthMargin = 0.1;
     var minAsk = parseFloat(depth.asks[0][0]);
     var maxBid = parseFloat(depth.bids[depth.bids.length - 1][0]);
     var avgPrice = (minAsk + maxBid) / 2.0;
@@ -138,36 +153,64 @@ function ProcessDepthData(depth)
     Plot([asks, bids], depthPriceMin, depthPriceMax);
 }
 
-var site = "OKCoin";
+var site = "";
+var pair = "";
 
-$(function() {
-    $("#okcoin").click(function() {
-        console.log("Selected: OKCoin");
-        site = "OKCoin";
-    });
-    $("#cex").click(function() {
-        console.log("Selected: CEX");
-        site = "CEX";
-    });
-
+function StartDataSync()
+{
     setInterval(function() {
-        var sites = {
-            "OKCoin": {
-                dataFile: "depth-okcoin.json"
-            },
-            "CEX": {
-                dataFile: "depth-cex.json"
-            }
-        };
-
-        $.getJSON("data/" + sites[site].dataFile, function(depth) {
-            if (depth.asks.length > 0 && depth.bids.length > 0) {
-                console.log("Retrieved data for " + site + ", BTC-USD");
-                console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
-                ProcessDepthData(depth);
-                $("#site").html(site);
-                $("#currencyPair").html("BTC - USD");
-            }
+        var fileName = "depth-" + site + "-" + pair;
+        $.getJSON("data/" + fileName, function(depth) {
+            console.log("Retrieved data for " + site + ", " + pair);
+            console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
+            $("#site").html(site);
+            $("#currencyPair").html(pair);
+            ProcessDepthData(depth);
         });
     }, 1000);
+}
+
+$(function() {
+    // Generate buttons for sites, cryptos, fiats
+    $.getJSON("data/enabled", function(enabledInfo) {
+        var $bar2 = $("#bar2");
+        for (var i = 0; i < enabledInfo.sites.length; i++) {
+            $bar2.append("<button class=\"site\">"
+                + enabledInfo.sites[i] + "</button>");
+        }
+        $bar2.append("<br><br>");
+        for (var i = 0; i < enabledInfo.cryptos.length; i++) {
+            $bar2.append("<button class=\"crypto\">"
+                + enabledInfo.cryptos[i] + "</button>");
+        }
+        $bar2.append("<br><br>");
+        for (var i = 0; i < enabledInfo.fiats.length; i++) {
+            $bar2.append("<button class=\"fiat\">"
+                + enabledInfo.fiats[i] + "</button>");
+        }
+        
+        $(".site").click(function(event) {
+            var $target = $(event.target);
+            site = $target.html();
+            console.log("Selected site " + site);
+        });
+        $(".crypto").click(function(event) {
+            var $target = $(event.target);
+            pair = pair.split("-");
+            pair[0] = $target.html();
+            pair = pair.join("-");
+            console.log("Selected currencies: " + pair);
+        });
+        $(".fiat").click(function(event) {
+            var $target = $(event.target);
+            pair = pair.split("-");
+            pair[1] = $target.html();
+            pair = pair.join("-");
+            console.log("Selected currencies: " + pair);
+        });
+
+        site = enabledInfo.sites[0];
+        pair = enabledInfo.cryptos[0] + "-" + enabledInfo.fiats[0];
+        StartDataSync();
+    });
 });

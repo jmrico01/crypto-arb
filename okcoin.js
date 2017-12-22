@@ -12,17 +12,17 @@ function Print(msg)
     console.log("(OKCoin) " + msg);
 }
 
-function CompareFloatStrings(s1, s2)
+function StdPairToOKC(pair)
 {
-    var f1 = parseFloat(s1);
-    var f2 = parseFloat(s2);
-    if (f1 < f2)    return -1;
-    if (f1 > f2)    return 1;
-    else            return 0;
+    return pair.toLowerCase().split("-").join("_");
 }
 
-var asks = ordHash.Create(CompareFloatStrings);
-var bids = ordHash.Create(CompareFloatStrings);
+function OKCPairToStd(pair)
+{
+    return pair.toUpperCase().split("_").join("-");
+}
+
+var mktData = {};
 
 var connection = null;
 
@@ -32,6 +32,20 @@ function CreateConnection()
 
     var checkConnInterval = null;
     var CHECK_CONN_TIME = 5; // secs
+
+    function ClearData(pair)
+    {
+        if (pair === undefined || pair === null) {
+            for (var p in mktData) {
+                mktData[p].asks.clear();
+                mktData[p].bids.clear();
+            }
+        }
+        else {
+            mktData[pair].asks.clear();
+            mktData[pair].bids.clear();
+        }
+    }
 
     function WebSocketSend(data)
     {
@@ -53,11 +67,10 @@ function CreateConnection()
             ws = null;
         }
 
-        asks.clear();
-        bids.clear();
+        ClearData();
     }
 
-    function ProcessIncDepthMessage(data)
+    function ProcessIncDepthMessage(data, pair)
     {
         var timestamp = data.timestamp;
         if (data.asks !== undefined) {
@@ -65,16 +78,16 @@ function CreateConnection()
                 var price = data.asks[i][0];
                 var volume = data.asks[i][1];
 
-                if (asks.exists(price)) {
+                if (mktData[pair].asks.exists(price)) {
                     if (parseFloat(volume) === 0.0) {
-                        asks.delete(price);
+                        mktData[pair].asks.delete(price);
                     }
                     else {
-                        asks.set(price, [volume, timestamp]);
+                        mktData[pair].asks.set(price, [volume, timestamp]);
                     }
                 }
                 else {
-                    asks.insert(price, [volume, timestamp]);
+                    mktData[pair].asks.insert(price, [volume, timestamp]);
                 }
             }
         }
@@ -83,19 +96,29 @@ function CreateConnection()
                 var price = data.bids[i][0];
                 var volume = data.bids[i][1];
                 
-                if (bids.exists(price)) {
+                if (mktData[pair].bids.exists(price)) {
                     if (parseFloat(volume) === 0.0) {
-                        bids.delete(price);
+                        mktData[pair].bids.delete(price);
                     }
                     else {
-                        bids.set(price, [volume, timestamp]);
+                        mktData[pair].bids.set(price, [volume, timestamp]);
                     }
                 }
                 else {
-                    bids.insert(price, [volume, timestamp]);
+                    mktData[pair].bids.insert(price, [volume, timestamp]);
                 }
             }
         }
+    }
+
+    function MsgChannelIsDepth(msg)
+    {
+        if (msg.channel.length === 25) {
+            return (msg.channel.substring(0, 12) === "ok_sub_spot_")
+                && (msg.channel.substring(19, 25) === "_depth");
+        }
+
+        return false;
     }
 
     function OnIncoming(msg)
@@ -117,8 +140,9 @@ function CreateConnection()
 
             msg = msg[0];
             if (msg.hasOwnProperty("channel")) {
-                if (msg.channel === "ok_sub_spot_btc_usd_depth") {
-                    ProcessIncDepthMessage(msg.data);
+                if (MsgChannelIsDepth(msg)) {
+                    var pairOKC = msg.channel.substring(12, 19);
+                    ProcessIncDepthMessage(msg.data, OKCPairToStd(pairOKC));
                 }
                 else if (msg.channel === "addChannel") {
                 }
@@ -149,11 +173,13 @@ function CreateConnection()
     ws.on("message", OnIncoming);
     ws.on("open", function() {
         Print("connection opened");
-        var req = {
-            event: "addChannel",
-            channel: "ok_sub_spot_btc_usd_depth"
-        };
-        WebSocketSend(req);
+        for (var pair in mktData) {
+            var req = {
+                event: "addChannel",
+                channel: "ok_sub_spot_" + StdPairToOKC(pair) + "_depth"
+            };
+            WebSocketSend(req);
+        }
 
         // Send heartbeats
         setInterval(function() {
@@ -170,7 +196,48 @@ function CreateConnection()
     });
 }
 
-connection = CreateConnection();
+function CompareFloatStrings(s1, s2)
+{
+    var f1 = parseFloat(s1);
+    var f2 = parseFloat(s2);
+    if (f1 < f2)    return -1;
+    if (f1 > f2)    return 1;
+    else            return 0;
+}
 
-exports.asks = asks;
-exports.bids = bids;
+function Start(pairs)
+{
+    var supportedCryptos = [
+        "BTC",
+        "LTC",
+        "ETH",
+        "ETC",
+        "BCC"
+    ];
+    var supportedFiats = [
+        "USD"
+    ];
+
+    var supportedPairs = [];
+    for (var i = 0; i < supportedFiats.length; i++) {
+        for (var j = 0; j < supportedCryptos.length; j++) {
+            supportedPairs.push(supportedCryptos[j] + "-" + supportedFiats[i]);
+        }
+    }
+
+    for (var i = 0; i < pairs.length; i++) {
+        if (supportedPairs.indexOf(pairs[i]) >= 0) {
+            mktData[pairs[i]] = {
+                asks: ordHash.Create(CompareFloatStrings),
+                bids: ordHash.Create(CompareFloatStrings)
+            };
+        }
+    }
+
+    connection = CreateConnection();
+}
+
+exports.data = mktData;
+//exports.asks = asks;
+//exports.bids = bids;
+exports.Start = Start;

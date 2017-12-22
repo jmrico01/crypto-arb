@@ -14,15 +14,14 @@ function Print(msg)
     console.log("(CEX) " + msg);
 }
 
-function CompareFloats(f1, f2)
-{
-    if (f1 < f2)        return -1;
-    else if (f1 > f2)   return 1;
-    else                return 0;
-}
-
-var asks = ordHash.Create(CompareFloats);
-var bids = ordHash.Create(CompareFloats);
+var mktData = {
+    // Example entry
+    // 
+    // "BTC-USD": {
+    //     asks: ordHash.Create(...),
+    //     bids: ordHash.Create(...)
+    // }
+};
 
 var connection = null;
 
@@ -56,7 +55,26 @@ function CreateConnection()
     var rebuildOrderBookInterval = null;
 
     var RECEIVED_IDS_MAX = 4;
-    var receivedIDs = [];
+    var receivedIDs = {};
+    for (var pair in mktData) {
+        receivedIDs[pair] = [];
+    }
+
+    function ClearData(pair)
+    {
+        if (pair === undefined || pair === null) {
+            for (var p in mktData) {
+                mktData[p].asks.clear();
+                mktData[p].bids.clear();
+                receivedIDs[p] = [];
+            }
+        }
+        else {
+            mktData[pair].asks.clear();
+            mktData[pair].bids.clear();
+            receivedIDs[pair] = [];
+        }
+    }
 
     function WebSocketSend(data)
     {
@@ -104,62 +122,59 @@ function CreateConnection()
         }
         lastTickerOID = null;
 
-        receivedIDs = [];
-        asks.clear();
-        bids.clear();
+        ClearData();
     }
 
     function AddMarketData(data)
     {
+        var pair = data.pair.replace(":", "-");
+
         // Check received IDs for missing data
-        receivedIDs.push(data.id);
-        receivedIDs.sort();
-        if (receivedIDs.length > RECEIVED_IDS_MAX) {
-            receivedIDs = receivedIDs.slice(1, RECEIVED_IDS_MAX + 1);
+        receivedIDs[pair].push(data.id);
+        receivedIDs[pair].sort();
+        if (receivedIDs[pair].length > RECEIVED_IDS_MAX) {
+            receivedIDs[pair] = receivedIDs[pair].slice(1, RECEIVED_IDS_MAX + 1);
         }
-        if (receivedIDs.length == RECEIVED_IDS_MAX) {
-            if (receivedIDs[1] - receivedIDs[0] !== 1) {
-                Print("missed market data frame, closing");
+        if (receivedIDs[pair].length === RECEIVED_IDS_MAX) {
+            if (receivedIDs[pair][1] - receivedIDs[pair][0] !== 1) {
+                // TODO should rebuild here instead.
+                Print("missed market data frame for " + pair + ", closing");
                 Close();
             }
         }
     
         var time = data.time;
         for (var i = 0; i < data.asks.length; i++) {
-            //var price = data.asks[i][0].toFixed(DECIMALS);
-            //var volume = data.asks[i][1].toFixed(DECIMALS);
             var price = data.asks[i][0];
             var volume = data.asks[i][1];
     
-            if (asks.exists(price)) {
+            if (mktData[pair].asks.exists(price)) {
                 if (volume === 0) {
-                    asks.delete(price);
+                    mktData[pair].asks.delete(price);
                 }
                 else {
-                    asks.set(price, [volume, time]);
+                    mktData[pair].asks.set(price, [volume, time]);
                 }
             }
             else {
-                asks.insert(price, [volume, time]);
+                mktData[pair].asks.insert(price, [volume, time]);
             }
             break;
         }
         for (var i = 0; i < data.bids.length; i++) {
-            //var price = data.bids[i][0].toFixed(DECIMALS);
-            //var volume = data.bids[i][1].toFixed(DECIMALS);
             var price = data.bids[i][0];
             var volume = data.bids[i][1];
     
-            if (bids.exists(price)) {
+            if (mktData[pair].bids.exists(price)) {
                 if (volume === 0) {
-                    bids.delete(price);
+                    mktData[pair].bids.delete(price);
                 }
                 else {
-                    bids.set(price, [volume, time]);
+                    mktData[pair].bids.set(price, [volume, time]);
                 }
             }
             else {
-                bids.insert(price, [volume, time]);
+                mktData[pair].bids.insert(price, [volume, time]);
             }
             break;
         }
@@ -170,6 +185,11 @@ function CreateConnection()
         if (msg.hasOwnProperty("ok")) {
             if (msg.ok !== "ok") {
                 Print("order book subscribe not OK");
+                if (msg.hasOwnProperty("data")) {
+                    if (msg.data.hasOwnProperty("error")) {
+                        Print("(" + msg.data.error + ")");
+                    }
+                }
                 return;
             }
         }
@@ -188,9 +208,7 @@ function CreateConnection()
             }
         }
 
-        asks.clear();
-        bids.clear();
-        receivedIDs = [];
+        ClearData();
     
         //Print((new Date(Date.now())).toTimeString() + ": Rebuilding order book");
         var orderBookSub = {
@@ -246,21 +264,22 @@ function CreateConnection()
             oid: "0"
         };
         ws.send(JSON.stringify(getBalance));*/
-        var orderBookSub = {
-            "e": "order-book-subscribe",
-            "data": {
-                "pair": [
-                    "BTC",
-                    "USD"
-                ],
-                "subscribe": true,
-                "depth": 0
-            },
-            "oid": "0"
-        };
-        WebSocketSend(orderBookSub);
+        for (var pair in mktData) {
+            var orderBookSub = {
+                "e": "order-book-subscribe",
+                "data": {
+                    "pair": pair.split("-"),
+                    "subscribe": true,
+                    "depth": 0
+                },
+                "oid": "0"
+            };
+            WebSocketSend(orderBookSub);
+        }
     
-        rebuildOrderBookInterval = setInterval(function() {
+        checkConnInterval = setInterval(CheckConnection, CHECK_CONN_TIME * 1000);
+
+        /*rebuildOrderBookInterval = setInterval(function() {
             //Print((new Date(Date.now())).toTimeString() + ": Requesting to rebuild order book");
             var unsub = {
                 e: "order-book-unsubscribe",
@@ -270,7 +289,7 @@ function CreateConnection()
                 oid: "0"
             };
             WebSocketSend(unsub);
-        }, REBUILD_ORDER_BOOK_TIME * 1000);
+        }, REBUILD_ORDER_BOOK_TIME * 1000);*/
     }
     
     function OnIncoming(msg)
@@ -355,11 +374,51 @@ function CreateConnection()
         Print("restarting conection");
         connection = CreateConnection();
     });
-
-    checkConnInterval = setInterval(CheckConnection, CHECK_CONN_TIME * 1000);
 }
 
-connection = CreateConnection();
+function CompareFloats(f1, f2)
+{
+    if (f1 < f2)        return -1;
+    else if (f1 > f2)   return 1;
+    else                return 0;
+}
 
-exports.asks = asks;
-exports.bids = bids;
+function Start(pairs)
+{
+    var supportedCryptos = [
+        "BTC",
+        "ETH",
+        "BCH",
+        "BTG",
+        "DASH",
+        "XRP",
+        "ZEC",
+        "GHS"
+    ];
+    var supportedFiats = [
+        "USD",
+        "EUR",
+        "GBP"
+    ];
+
+    var supportedPairs = [];
+    for (var i = 0; i < supportedFiats.length; i++) {
+        for (var j = 0; j < supportedCryptos.length; j++) {
+            supportedPairs.push(supportedCryptos[j] + "-" + supportedFiats[i]);
+        }
+    }
+
+    for (var i = 0; i < pairs.length; i++) {
+        if (supportedPairs.indexOf(pairs[i]) >= 0) {
+            mktData[pairs[i]] = {
+                asks: ordHash.Create(CompareFloats),
+                bids: ordHash.Create(CompareFloats)
+            };
+        }
+    }
+
+    connection = CreateConnection();
+}
+
+exports.Start = Start;
+exports.data = mktData;
