@@ -9,43 +9,67 @@ const secret = fs.readFileSync("keys/cex", "utf8").trim();
 
 const host = "wss://ws.cex.io/ws";
 
-var ws = null;
-var lastTickerOID = null;
-var checkConnInterval = null;
-var REBUILD_ORDER_BOOK_TIME = 15; // seconds
-var rebuildOrderBookInterval = null;
-
-function WebSocketSend(data)
+function Print(msg)
 {
-    if (ws !== null && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(data));
-    }
+    console.log("(CEX) " + msg);
+}
+
+function CompareFloats(f1, f2)
+{
+    if (f1 < f2)        return -1;
+    else if (f1 > f2)   return 1;
+    else                return 0;
+}
+
+var asks = ordHash.Create(CompareFloats);
+var bids = ordHash.Create(CompareFloats);
+
+var connection = null;
+
+function CreateAuthRequest(apiKey, apiSecret)
+{
+    // Convert timestamp from milliseconds to integer seconds
+    var timestamp = Math.floor(Date.now() / 1000);
+    var signatureHash = crypto.createHmac("sha256", apiSecret);
+    signatureHash.update(timestamp + apiKey);
+    var args = {
+        e: "auth",
+        auth: {
+            key: apiKey,
+            signature: signatureHash.digest("hex"),
+            timestamp: timestamp
+        }
+    };
+
+    return args;
 }
 
 function CreateConnection()
 {
-    if (ws !== null || checkConnInterval !== null) {
-        console.assert(false, "CreateConection without close");
+    var ws = null;
+
+    var checkConnInterval = null;
+    var CHECK_CONN_TIME = 5; // secs
+    var lastTickerOID = null;
+
+    var REBUILD_ORDER_BOOK_TIME = 15; // secs
+    var rebuildOrderBookInterval = null;
+
+    var RECEIVED_IDS_MAX = 4;
+    var receivedIDs = [];
+
+    function WebSocketSend(data)
+    {
+        if (ws !== null && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(data));
+        } 
     }
 
-    ws = new WebSocket(host);
-    ws.on("message", OnIncoming);
-    ws.on("open", function() {
-        //console.log("Client: connected");
-    });
-    ws.on("close", function(code, reason) {
-        console.log("Client: connection closed, code " + code);
-        console.log(reason);
-        ws = null;
-        CloseConnection();
-        CreateConnection();
-    });
-
-    checkConnInterval = setInterval(function() {
+    function CheckConnection()
+    {
         if (lastTickerOID !== null) {
-            console.log("Client: server didn't respond ticker, restarting");
-            CloseConnection();
-            CreateConnection();
+            Print("server didn't respond ticker, closing");
+            Close();
             return;
         }
 
@@ -56,319 +80,286 @@ function CreateConnection()
             oid: lastTickerOID
         }
         WebSocketSend(ticker);
-    }, 5000);
-}
-CreateConnection();
+    }
 
-function CloseConnection()
-{
-    if (ws !== null) {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.close();
+    function Close()
+    {
+        Print("call to Close()");
+
+        if (ws !== null) {
+            ws.on("message", function() {});
+            if (ws.readyState === WebSocket.OPEN) {
+                //ws.close();
+                ws.terminate();
+            }
+            ws = null;
         }
-        ws = null;
-    }
-    if (checkConnInterval !== null) {
-        clearInterval(checkConnInterval);
-        checkConnInterval = null;
-    }
-    if (rebuildOrderBookInterval !== null) {
-        clearInterval(rebuildOrderBookInterval);
-        rebuildOrderBookInterval = null;
-    }
-    lastTickerOID = null;
-    asks.clear();
-    bids.clear();
-    receivedIDs = [];
-}
-
-function CreateSignature(timestamp, apiKey, apiSecret)
-{
-    var hash = crypto.createHmac("sha256", apiSecret)
-    hash.update(timestamp + apiKey)
-    return hash.digest("hex")
-}
-
-function CreateAuthRequest(apiKey, apiSecret)
-{
-    // Convert timestamp from milliseconds to integer seconds
-    var timestamp = Math.floor(Date.now() / 1000);
-    var args = {
-        e: "auth",
-        auth: {
-            key: apiKey,
-            signature: CreateSignature(timestamp, apiKey, apiSecret),
-            timestamp: timestamp
+        if (checkConnInterval !== null) {
+            clearInterval(checkConnInterval);
+            checkConnInterval = null;
         }
-    };
-
-    return args;
-}
-
-function CompareFloats(f1, f2)
-{
-    if (f1 < f2)        return -1;
-    else if (f1 > f2)   return 1;
-    else                return 0;
-}
-function CompareFloatStrings(s1, s2)
-{
-    var f1 = parseFloat(s1);
-    var f2 = parseFloat(s2);
-    if (f1 < f2)    return -1;
-    if (f1 > f2)    return 1;
-    else            return 0;
-}
-
-//const DECIMALS = 10;
-//var asks = ordHash.Create(CompareFloatStrings);
-//var bids = ordHash.Create(CompareFloatStrings);
-var asks = ordHash.Create(CompareFloats);
-var bids = ordHash.Create(CompareFloats);
-var RECEIVED_IDS_MAX = 4;
-var receivedIDs = [];
-
-function AddMarketData(data)
-{
-    // Check received IDs for missing data
-    receivedIDs.push(data.id);
-    receivedIDs.sort();
-    if (receivedIDs.length > RECEIVED_IDS_MAX) {
-        receivedIDs = receivedIDs.slice(1, RECEIVED_IDS_MAX + 1);
-    }
-    if (receivedIDs.length == RECEIVED_IDS_MAX) {
-        if (receivedIDs[1] - receivedIDs[0] !== 1) {
-            console.log("Missed market data frame, restarting");
-            CloseConnection();
+        if (rebuildOrderBookInterval !== null) {
+            clearInterval(rebuildOrderBookInterval);
+            rebuildOrderBookInterval = null;
         }
+        lastTickerOID = null;
+
+        receivedIDs = [];
+        asks.clear();
+        bids.clear();
     }
 
-    var time = data.time;
-    for (var i = 0; i < data.asks.length; i++) {
-        //var price = data.asks[i][0].toFixed(DECIMALS);
-        //var volume = data.asks[i][1].toFixed(DECIMALS);
-        var price = data.asks[i][0];
-        var volume = data.asks[i][1];
-
-        if (asks.exists(price)) {
-            if (volume === 0) {
-                asks.delete(price);
+    function AddMarketData(data)
+    {
+        // Check received IDs for missing data
+        receivedIDs.push(data.id);
+        receivedIDs.sort();
+        if (receivedIDs.length > RECEIVED_IDS_MAX) {
+            receivedIDs = receivedIDs.slice(1, RECEIVED_IDS_MAX + 1);
+        }
+        if (receivedIDs.length == RECEIVED_IDS_MAX) {
+            if (receivedIDs[1] - receivedIDs[0] !== 1) {
+                Print("missed market data frame, closing");
+                Close();
+            }
+        }
+    
+        var time = data.time;
+        for (var i = 0; i < data.asks.length; i++) {
+            //var price = data.asks[i][0].toFixed(DECIMALS);
+            //var volume = data.asks[i][1].toFixed(DECIMALS);
+            var price = data.asks[i][0];
+            var volume = data.asks[i][1];
+    
+            if (asks.exists(price)) {
+                if (volume === 0) {
+                    asks.delete(price);
+                }
+                else {
+                    asks.set(price, [volume, time]);
+                }
             }
             else {
-                asks.set(price, [volume, time]);
+                asks.insert(price, [volume, time]);
             }
+            break;
         }
-        else {
-            asks.insert(price, [volume, time]);
-        }
-        break;
-    }
-    for (var i = 0; i < data.bids.length; i++) {
-        //var price = data.bids[i][0].toFixed(DECIMALS);
-        //var volume = data.bids[i][1].toFixed(DECIMALS);
-        var price = data.bids[i][0];
-        var volume = data.bids[i][1];
-
-        if (bids.exists(price)) {
-            if (volume === 0) {
-                bids.delete(price);
+        for (var i = 0; i < data.bids.length; i++) {
+            //var price = data.bids[i][0].toFixed(DECIMALS);
+            //var volume = data.bids[i][1].toFixed(DECIMALS);
+            var price = data.bids[i][0];
+            var volume = data.bids[i][1];
+    
+            if (bids.exists(price)) {
+                if (volume === 0) {
+                    bids.delete(price);
+                }
+                else {
+                    bids.set(price, [volume, time]);
+                }
             }
             else {
-                bids.set(price, [volume, time]);
+                bids.insert(price, [volume, time]);
             }
+            break;
         }
-        else {
-            bids.insert(price, [volume, time]);
-        }
-        break;
-    }
-}
-
-function HandleOrderBookSubscribe(msg)
-{
-    if (msg.hasOwnProperty("ok")) {
-        if (msg.ok !== "ok") {
-            console.log("Order book subscription not OK");
-            return;
-        }
-    }
-
-    // NOTE: for some reason, this sends time in seconds
-    msg.data.time = msg.data.timestamp * 1000;
-    AddMarketData(msg.data);
-}
-
-function HandleOrderBookUnsubscribe(msg)
-{
-    if (msg.hasOwnProperty("ok")) {
-        if (msg.ok !== "ok") {
-            console.log("Order book unsubscribe not OK");
-            return;
-        }
-    }
-
-    asks.clear();
-    bids.clear();
-    receivedIDs = [];
-
-    console.log((new Date(Date.now())).toTimeString() + ": Rebuilding order book");
-    var orderBookSub = {
-        "e": "order-book-subscribe",
-        "data": {
-            "pair": [
-                "BTC",
-                "USD"
-            ],
-            "subscribe": true,
-            "depth": 0
-        },
-        "oid": "1435927928274_3_order-book-subscribe"
-    };
-    WebSocketSend(orderBookSub);
-}
-
-function MsgIsRateLimit(msg)
-{
-    if (msg.hasOwnProperty("data")) {
-        if (msg.data.hasOwnProperty("error")) {
-            if (msg.data.error === "Rate limit exceeded") {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-function HandleTicker(msg)
-{
-    if (msg.oid === lastTickerOID) {
-        if (msg.ok === "ok") {
-            lastTickerOID = null;
-        }
-        else {
-            console.log("Server: ticker not OK, restarting")
-            CloseConnection();
-            CreateConnection();
-        }
-    }
-    else {
-        console.log("Server: mismatched ticker message, restarting");
-        CloseConnection();
-        CreateConnection();
-    }
-}
-
-function OnAuthenticated()
-{
-    /*var ticker = {
-        e: "ticker",
-        data: [
-            "BTC", "USD"
-        ],
-        oid: "0"
-    };
-    ws.send(JSON.stringify(ticker));*/
-    /*var getBalance = {
-        e: "get-balance",
-        data: {},
-        oid: "0"
-    };
-    ws.send(JSON.stringify(getBalance));*/
-    var orderBookSub = {
-        "e": "order-book-subscribe",
-        "data": {
-            "pair": [
-                "BTC",
-                "USD"
-            ],
-            "subscribe": true,
-            "depth": 0
-        },
-        "oid": "1435927928274_3_order-book-subscribe"
-    };
-    WebSocketSend(orderBookSub);
-
-    rebuildOrderBookInterval = setInterval(function() {
-        console.log((new Date(Date.now())).toTimeString() + ": Requesting to rebuild order book");
-        var unsub = {
-            e: "order-book-unsubscribe",
-            data: {
-                pair: [ "BTC", "USD" ]
-            },
-            oid: "0"
-        };
-        WebSocketSend(unsub);
-    }, REBUILD_ORDER_BOOK_TIME * 1000);
-}
-
-function OnIncoming(msg)
-{
-    if (ws === null) {
-        // Connection has been closed, don't handle this.
-        return;
-    }
-
-    try {
-        msg = JSON.parse(msg);
-    }
-    catch (err) {
-        console.log("Unparsable msg:");
-        console.log(msg);
-        return;
-    }
-    if (!msg.hasOwnProperty("e")) {
-        console.log("Malformed msg:");
-        console.log(msg);
-        return;
     }
     
-    if (msg.e === "connected") {
-        //console.log("Server: connected");
-        WebSocketSend(CreateAuthRequest(key, secret));
-    }
-    else if (msg.e === "auth") {
-        if (msg.ok === "ok") {
-            console.log("Server: authenticated");
-            OnAuthenticated();
-        }
-        else {
-            console.log("Server: authentication failed");
-            if (msg.hasOwnProperty("data") && msg.data.hasOwnProperty("error")) {
-                console.log("(" + msg.data.error + ")");
+    function HandleOrderBookSubscribe(msg)
+    {
+        if (msg.hasOwnProperty("ok")) {
+            if (msg.ok !== "ok") {
+                Print("order book subscribe not OK");
+                return;
             }
-            CloseConnection();
         }
-    }
-    else if (msg.e === "ping") {
-        //console.log("Server: ping");
-        WebSocketSend({ e: "pong" });
-    }
-    else if (msg.e === "disconnecting") {
-        console.log("Server: disconnect (" + msg.reason + ")");
-        CloseConnection();
-        CreateConnection();
-    }
-    else if (MsgIsRateLimit(msg)) {
-        console.log("Server: rate limit exceeded");
-    }
-    else if (msg.e === "ticker") {
-        HandleTicker(msg);
-    }
-    else if (msg.e === "order-book-subscribe") {
-        HandleOrderBookSubscribe(msg);
-    }
-    else if (msg.e === "order-book-unsubscribe") {
-        HandleOrderBookUnsubscribe(msg);
-    }
-    else if (msg.e === "md_update") {
+    
+        // NOTE: for some reason, this first msg sends time in seconds
+        msg.data.time = msg.data.timestamp * 1000;
         AddMarketData(msg.data);
     }
-    else {
-        console.log("Unhandled message:");
-        console.log(msg);
+    
+    function HandleOrderBookUnsubscribe(msg)
+    {
+        if (msg.hasOwnProperty("ok")) {
+            if (msg.ok !== "ok") {
+                Print("order book unsubscribe not OK");
+                return;
+            }
+        }
+
+        asks.clear();
+        bids.clear();
+        receivedIDs = [];
+    
+        //Print((new Date(Date.now())).toTimeString() + ": Rebuilding order book");
+        var orderBookSub = {
+            "e": "order-book-subscribe",
+            "data": {
+                "pair": [
+                    "BTC",
+                    "USD"
+                ],
+                "subscribe": true,
+                "depth": 0
+            },
+            "oid": "0"
+        };
+        WebSocketSend(orderBookSub);
     }
+    
+    function MsgIsRateLimit(msg)
+    {
+        if (msg.hasOwnProperty("data")) {
+            if (msg.data.hasOwnProperty("error")) {
+                if (msg.data.error === "Rate limit exceeded") {
+                    return true;
+                }
+            }
+        }
+    
+        return false;
+    }
+    
+    function HandleTicker(msg)
+    {
+        if (msg.oid === lastTickerOID) {
+            if (msg.ok === "ok") {
+                lastTickerOID = null;
+            }
+            else {
+                Print("ticker not OK, closing");
+                Close();
+            }
+        }
+        else {
+            Print("mismatched ticker message, closing");
+            Close();
+        }
+    }
+    
+    function OnAuthenticated()
+    {
+        /*var getBalance = {
+            e: "get-balance",
+            data: {},
+            oid: "0"
+        };
+        ws.send(JSON.stringify(getBalance));*/
+        var orderBookSub = {
+            "e": "order-book-subscribe",
+            "data": {
+                "pair": [
+                    "BTC",
+                    "USD"
+                ],
+                "subscribe": true,
+                "depth": 0
+            },
+            "oid": "0"
+        };
+        WebSocketSend(orderBookSub);
+    
+        rebuildOrderBookInterval = setInterval(function() {
+            //Print((new Date(Date.now())).toTimeString() + ": Requesting to rebuild order book");
+            var unsub = {
+                e: "order-book-unsubscribe",
+                data: {
+                    pair: [ "BTC", "USD" ]
+                },
+                oid: "0"
+            };
+            WebSocketSend(unsub);
+        }, REBUILD_ORDER_BOOK_TIME * 1000);
+    }
+    
+    function OnIncoming(msg)
+    {
+        if (ws === null) {
+            // Connection has been closed, drop messages.
+            return;
+        }
+    
+        try {
+            msg = JSON.parse(msg);
+        }
+        catch (err) {
+            Print("unparsable msg:");
+            Print(msg);
+            return;
+        }
+        if (!msg.hasOwnProperty("e")) {
+            Print("malformed msg:");
+            Print(msg);
+            return;
+        }
+        
+        if (msg.e === "connected") {
+            //Print("Server: connected");
+            WebSocketSend(CreateAuthRequest(key, secret));
+        }
+        else if (msg.e === "auth") {
+            if (msg.ok === "ok") {
+                Print("authenticated");
+                OnAuthenticated();
+            }
+            else {
+                Print("authentication failed");
+                if (msg.hasOwnProperty("data") && msg.data.hasOwnProperty("error")) {
+                    Print("(" + msg.data.error + ")");
+                }
+                Close();
+            }
+        }
+        else if (msg.e === "ping") {
+            //Print("Server: ping");
+            WebSocketSend({ e: "pong" });
+        }
+        else if (msg.e === "disconnecting") {
+            Print("served disconnected (" + msg.reason + ")");
+            Close();
+            //CloseConnection();
+            //CreateConnection();
+        }
+        else if (MsgIsRateLimit(msg)) {
+            Print("rate limit exceeded");
+        }
+        else if (msg.e === "ticker") {
+            HandleTicker(msg);
+        }
+        else if (msg.e === "order-book-subscribe") {
+            HandleOrderBookSubscribe(msg);
+        }
+        else if (msg.e === "order-book-unsubscribe") {
+            HandleOrderBookUnsubscribe(msg);
+        }
+        else if (msg.e === "md_update") {
+            AddMarketData(msg.data);
+        }
+        else {
+            Print("unhandled message:");
+            Print(msg);
+        }
+    }
+
+    ws = new WebSocket(host);
+    ws.on("message", OnIncoming);
+    ws.on("open", function() {
+        //Print("Client: connected");
+    });
+    ws.on("close", function(code, reason) {
+        Print("connection closed, code " + code);
+        Print(reason);
+
+        // Restart connection globally here.
+        Print("restarting conection");
+        connection = CreateConnection();
+    });
+
+    checkConnInterval = setInterval(CheckConnection, CHECK_CONN_TIME * 1000);
 }
+
+connection = CreateConnection();
 
 exports.asks = asks;
 exports.bids = bids;

@@ -6,36 +6,47 @@ const path = require("path");
 const express = require("express");
 const app = express();
 
+const sites = {
+    "OKCoin": {
+        module: okcoin,
+        entryParser: function(entry) {
+            return entry;
+        },
+        frontEndFile: "depth-okcoin.json"
+    },
+    "CEX": {
+        module: cex,
+        entryParser: function(entry) {
+            const DECIMALS = 4;
+            return [
+                entry[0].toFixed(DECIMALS),
+                [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
+            ];
+        },
+        frontEndFile: "depth-cex.json"
+    }
+};
+
+const enabledCurrencies = [
+    "BTC",
+    "ETH",
+    "BCH",
+    "LTC"
+];
+
+const enabledSites = [
+    "OKCoin",
+    "CEX"
+];
+
 app.set("port", 8080);
 app.use(express.static(path.join(__dirname, "public")));
 app.listen(app.get("port"));
 
 setInterval(function() {
     const frontEndPath = "public/data/";
-    const sites = [
-        {
-            name: "OKCoin",
-            module: okcoin,
-            entryParser: function(entry) {
-                return entry;
-            },
-            frontEndFile: "depth-okcoin.json"
-        },
-        {
-            name: "CEX",
-            module: cex,
-            entryParser: function(entry) {
-                const DECIMALS = 4;
-                return [
-                    entry[0].toFixed(DECIMALS),
-                    [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
-                ];
-            },
-            frontEndFile: "depth-cex.json"
-        }
-    ];
-    for (var s = 0; s < sites.length; s++) {
-        //console.log("Writing data for " + sites[s].name);
+    for (var s in sites) {
+        //console.log("Writing data for " + s);
         var depth = {
             asks: [],
             bids: []
