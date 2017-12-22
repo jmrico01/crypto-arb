@@ -51,7 +51,7 @@ function CreateConnection()
     var CHECK_CONN_TIME = 5; // secs
     var lastTickerOID = null;
 
-    var REBUILD_ORDER_BOOK_TIME = 15; // secs
+    var REBUILD_ORDER_BOOK_TIME = 20; // secs
     var rebuildOrderBookInterval = null;
 
     var RECEIVED_IDS_MAX = 4;
@@ -124,6 +124,33 @@ function CreateConnection()
 
         ClearData();
     }
+    
+    function RequestRebuild(pair)
+    {
+        Print((new Date(Date.now())).toTimeString() + ": Request rebuild for " + pair);
+        if (pair === undefined || pair === null) {
+            for (var p in mktData) {
+                var unsub = {
+                    e: "order-book-unsubscribe",
+                    data: {
+                        pair: p.split("-")
+                    },
+                    oid: "0"
+                };
+                WebSocketSend(unsub);
+            }
+        }
+        else {
+            var unsub = {
+                e: "order-book-unsubscribe",
+                data: {
+                    pair: pair.split("-")
+                },
+                oid: "0"
+            };
+            WebSocketSend(unsub);
+        }
+    }
 
     function AddMarketData(data)
     {
@@ -137,9 +164,10 @@ function CreateConnection()
         }
         if (receivedIDs[pair].length === RECEIVED_IDS_MAX) {
             if (receivedIDs[pair][1] - receivedIDs[pair][0] !== 1) {
-                // TODO should rebuild here instead.
-                Print("missed market data frame for " + pair + ", closing");
-                Close();
+                // TODO untested
+                Print("missed market data frame for " + pair + ", rebuilding");
+                RequestRebuild(pair);
+                //Close();
             }
         }
     
@@ -207,17 +235,15 @@ function CreateConnection()
                 return;
             }
         }
-
-        ClearData();
+        
+        Print((new Date(Date.now())).toTimeString() + ": Cleared order book for " + msg.data.pair);
+        ClearData(msg.data.pair.replace(":", "-"));
     
-        //Print((new Date(Date.now())).toTimeString() + ": Rebuilding order book");
+        Print((new Date(Date.now())).toTimeString() + ": Resubscribing for " + msg.data.pair);
         var orderBookSub = {
             "e": "order-book-subscribe",
             "data": {
-                "pair": [
-                    "BTC",
-                    "USD"
-                ],
+                "pair": msg.data.pair.split(":"),
                 "subscribe": true,
                 "depth": 0
             },
@@ -258,12 +284,6 @@ function CreateConnection()
     
     function OnAuthenticated()
     {
-        /*var getBalance = {
-            e: "get-balance",
-            data: {},
-            oid: "0"
-        };
-        ws.send(JSON.stringify(getBalance));*/
         for (var pair in mktData) {
             var orderBookSub = {
                 "e": "order-book-subscribe",
@@ -279,17 +299,9 @@ function CreateConnection()
     
         checkConnInterval = setInterval(CheckConnection, CHECK_CONN_TIME * 1000);
 
-        /*rebuildOrderBookInterval = setInterval(function() {
-            //Print((new Date(Date.now())).toTimeString() + ": Requesting to rebuild order book");
-            var unsub = {
-                e: "order-book-unsubscribe",
-                data: {
-                    pair: [ "BTC", "USD" ]
-                },
-                oid: "0"
-            };
-            WebSocketSend(unsub);
-        }, REBUILD_ORDER_BOOK_TIME * 1000);*/
+        rebuildOrderBookInterval = setInterval(function() {
+            RequestRebuild(null);
+        }, REBUILD_ORDER_BOOK_TIME * 1000);
     }
     
     function OnIncoming(msg)

@@ -93,7 +93,7 @@ function SetAskBidDisplay(depth)
         $("#maxBidAge").html("0");
         return;
     }
-    
+
     var minAskInd = 0;
     var maxBidInd = depth.bids.length - 1;
     $("#minAsk").html(depth.asks[minAskInd][0]);
@@ -160,6 +160,7 @@ function StartDataSync()
 {
     setInterval(function() {
         var fileName = "depth-" + site + "-" + pair;
+        // TODO Handle no data (404) case.
         $.getJSON("data/" + fileName, function(depth) {
             console.log("Retrieved data for " + site + ", " + pair);
             console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
