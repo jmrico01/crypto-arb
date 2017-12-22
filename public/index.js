@@ -3,9 +3,9 @@ function ClearPlot()
     d3.select("svg").remove();
 }
 
-function Plot(datasets)
+function Plot(datasets, xMin, xMax)
 {
-    var xMin = 100000000000.0;
+    /*var xMin = 100000000000.0;
     for (var i = 0; i < datasets.length; i++) {
         var localMin = d3.min(datasets[i], function(d) { return d[0] });
         if (xMin > localMin) {
@@ -18,7 +18,7 @@ function Plot(datasets)
         if (xMax < localMax) {
             xMax = localMax;
         }
-    }
+    }*/
     var yMax = 0.0;
     for (var i = 0; i < datasets.length; i++) {
         var localMax = d3.max(datasets[i], function(d) { return d[1] });
@@ -101,14 +101,17 @@ function ProcessDepthData(depth)
 {
     SetAskBidDisplay(depth);
 
-    var asks = [];
-    var bids = [];
     var depthMargin = 0.05;
     var minAsk = parseFloat(depth.asks[0][0]);
     var maxBid = parseFloat(depth.bids[depth.bids.length - 1][0]);
     var avgPrice = (minAsk + maxBid) / 2.0;
     var depthPriceMin = avgPrice * (1.0 - depthMargin);
     var depthPriceMax = avgPrice * (1.0 + depthMargin);
+    console.log(depthPriceMin);
+    console.log(depthPriceMax);
+
+    var asks = [];
+    var bids = [];
     for (var i = 0; i < depth.asks.length; i++) {
         var price = parseFloat(depth.asks[i][0]);
         if (price < depthPriceMin || price > depthPriceMax) {
@@ -134,18 +137,30 @@ function ProcessDepthData(depth)
     }
 
     ClearPlot();
-    Plot([asks, bids]);
+    Plot([asks, bids], depthPriceMin, depthPriceMax);
 }
 
 var set = false;
 
 $(function() {
     setInterval(function() {
-        $.getJSON("data/depth-okcoin.json", function(depth) {
-            console.log("Retrieved data for OKCoin, BTC-USD");
-            ProcessDepthData(depth);
-            $("#site").html("OKCoin");
-            $("#currencyPair").html("BTC - USD");
+        var sites = {
+            "OKCoin": {
+                dataFile: "depth-okcoin.json"
+            },
+            "CEX": {
+                dataFile: "depth-cex.json"
+            }
+        };
+
+        var site = "CEX";
+        $.getJSON("data/" + sites[site].dataFile, function(depth) {
+            if (depth.asks.length > 0 && depth.bids.length > 0) {
+                console.log("Retrieved data for " + site + ", BTC-USD");
+                ProcessDepthData(depth);
+                $("#site").html(site);
+                $("#currencyPair").html("BTC - USD");
+            }
         });
     }, 1000);
 });

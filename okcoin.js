@@ -1,4 +1,5 @@
 const WebSocket = require("ws");
+
 const ordHash = require("./ordered-hash");
 
 const key = "17de37be-57ff-4575-b12d-d4e1428dbf5a";
@@ -7,8 +8,7 @@ const host = "wss://real.okcoin.com:10440/websocket/okcoinapi";
 const ws = new WebSocket(host);
 ws.on("message", OnIncoming);
 ws.on("open", function open() {
-    console.log("Client: Connected");
-
+    //console.log("Client: Connected");
     var req = {
         event: "addChannel",
         channel: "ok_sub_spot_btc_usd_depth"
@@ -17,7 +17,6 @@ ws.on("open", function open() {
 
     // Send heartbeats
     setInterval(function() {
-        console.log()
         ws.send(JSON.stringify({ event: "ping" }));
     }, 10 * 1000)
 });
@@ -97,6 +96,8 @@ function OnIncoming(msg)
             if (msg.channel === "ok_sub_spot_btc_usd_depth") {
                 ProcessIncDepthMessage(msg.data);
             }
+            else if (msg.channel === "addChannel") {
+            }
             else {
                 console.log("Message from unhandled channel:")
                 console.log(msg);
@@ -110,7 +111,7 @@ function OnIncoming(msg)
     else {
         if (msg.hasOwnProperty("event")) {
             if (msg.event === "pong") {
-                console.log("pong!");
+                //console.log("pong!");
             }
         }
         else {

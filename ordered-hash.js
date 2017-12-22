@@ -42,6 +42,10 @@ function MakeOrderedHash(cmpFunc) {
             keys.splice(pos, 1);
             delete vals[k];
         },
+        clear: function() {
+            keys = [];
+            vals = {};
+        },
         exists: function(k) {
             if (!vals[k])   return false;
             else            return true;

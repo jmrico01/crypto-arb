@@ -16,16 +16,26 @@ setInterval(function() {
         {
             name: "OKCoin",
             module: okcoin,
+            entryParser: function(entry) {
+                return entry;
+            },
             frontEndFile: "depth-okcoin.json"
         },
         {
             name: "CEX",
             module: cex,
+            entryParser: function(entry) {
+                const DECIMALS = 4;
+                return [
+                    entry[0].toFixed(DECIMALS),
+                    [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
+                ];
+            },
             frontEndFile: "depth-cex.json"
         }
     ];
     for (var s = 0; s < sites.length; s++) {
-        console.log("Writing data for " + sites[s].name);
+        //console.log("Writing data for " + sites[s].name);
         var depth = {
             asks: [],
             bids: []
@@ -34,18 +44,20 @@ setInterval(function() {
 
         keys = sites[s].module.asks.keys();
         for (var i = 0; i < keys.length; i++) {
-            depth.asks.push([keys[i], sites[s].module.asks.val(keys[i])]);
+            var entry = [keys[i], sites[s].module.asks.val(keys[i])];
+            depth.asks.push(sites[s].entryParser(entry));
         }
         keys = sites[s].module.bids.keys();
         for (var i = 0; i < keys.length; i++) {
-            depth.bids.push([keys[i], sites[s].module.bids.val(keys[i])]);
+            var entry = [keys[i], sites[s].module.bids.val(keys[i])];
+            depth.bids.push(sites[s].entryParser(entry));
         }
 
-        /*fs.writeFile(frontEndPath + sites[s].frontEndFile,
+        fs.writeFile(frontEndPath + sites[s].frontEndFile,
             JSON.stringify(depth), "utf8", function(err) {
                 if (err) {
                     console.error(err);
                 }
-        });*/
+        });
     }
 }, 1000);
