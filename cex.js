@@ -10,9 +10,9 @@ const secret = fs.readFileSync("keys/cex", "utf8").trim();
 const host = "wss://ws.cex.io/ws";
 
 var ws = null;
-var checkConnInterval = null;
 var lastTickerOID = null;
-var REBUILD_ORDER_BOOK_TIME = 10; // seconds
+var checkConnInterval = null;
+var REBUILD_ORDER_BOOK_TIME = 15; // seconds
 var rebuildOrderBookInterval = null;
 
 function WebSocketSend(data)
@@ -63,7 +63,7 @@ CreateConnection();
 function CloseConnection()
 {
     if (ws !== null) {
-        if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+        if (ws.readyState === WebSocket.OPEN) {
             ws.close();
         }
         ws = null;
@@ -76,6 +76,7 @@ function CloseConnection()
         clearInterval(rebuildOrderBookInterval);
         rebuildOrderBookInterval = null;
     }
+    lastTickerOID = null;
     asks.clear();
     bids.clear();
     receivedIDs = [];

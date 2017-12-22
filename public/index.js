@@ -107,8 +107,6 @@ function ProcessDepthData(depth)
     var avgPrice = (minAsk + maxBid) / 2.0;
     var depthPriceMin = avgPrice * (1.0 - depthMargin);
     var depthPriceMax = avgPrice * (1.0 + depthMargin);
-    console.log(depthPriceMin);
-    console.log(depthPriceMax);
 
     var asks = [];
     var bids = [];
@@ -140,9 +138,18 @@ function ProcessDepthData(depth)
     Plot([asks, bids], depthPriceMin, depthPriceMax);
 }
 
-var set = false;
+var site = "OKCoin";
 
 $(function() {
+    $("#okcoin").click(function() {
+        console.log("Selected: OKCoin");
+        site = "OKCoin";
+    });
+    $("#cex").click(function() {
+        console.log("Selected: CEX");
+        site = "CEX";
+    });
+
     setInterval(function() {
         var sites = {
             "OKCoin": {
@@ -153,10 +160,10 @@ $(function() {
             }
         };
 
-        var site = "CEX";
         $.getJSON("data/" + sites[site].dataFile, function(depth) {
             if (depth.asks.length > 0 && depth.bids.length > 0) {
                 console.log("Retrieved data for " + site + ", BTC-USD");
+                console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
                 ProcessDepthData(depth);
                 $("#site").html(site);
                 $("#currencyPair").html("BTC - USD");
