@@ -1,0 +1,46 @@
+Fees for Cryptocurrency Exchange Sites
+-------------------------------------------------------------------------------
+NOTE: Generally, BTC deposits are free.
+However, all BTC withdrawals have some (flat?) fee.
+This is there to give an incentive to miners to
+include the transaction in new blocks.
+
+CEX
+-------------------------------------------------------------------------------
+USD Deposit (Credit Card): 3.5% + $0.25
+USD Deposit (Bank transfer): 0
+USD Withdrawal (VISA): $3.80
+USD Withdrawal (MasterCard): 1.2% + $3.80
+USD Withdrawal (Bank transfer): $50.00
+Taker: 0.25%
+Maker: 0.16%
+
+OKCoin
+-------------------------------------------------------------------------------
+USD Deposit/Withdrawal: NONE
+Taker: 0.20%
+Maker: 0.20%
+
+Kraken
+-------------------------------------------------------------------------------
+(almost verified)
+
+Taker: 0.26%
+Maker: 0.16%
+
+bitFlyer
+-------------------------------------------------------------------------------
+(need verification)
+
+USD Deposit/Withdrawal: NONE
+
+QUOINEX
+-------------------------------------------------------------------------------
+(need verification)
+
+USD Deposit (Bank transfer only): 0
+
+QuadrigaCX
+-------------------------------------------------------------------------------
+
+wtf am I doing with my life
