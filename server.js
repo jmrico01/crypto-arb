@@ -9,14 +9,14 @@ const app = express();
 
 const sites = {
     "OKCoin": {
-        enabled: false,
+        enabled: true,
         module: okcoin,
         entryParser: function(entry) {
             return entry;
         }
     },
     "CEX": {
-        enabled: false,
+        enabled: true,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
