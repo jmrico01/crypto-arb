@@ -9,6 +9,9 @@ const secret = fs.readFileSync("keys/cex", "utf8").trim();
 
 const host = "wss://ws.cex.io/ws";
 
+var sendCount = 0;
+var startTime = Date.now() * 1000.0;
+
 function Print(msg)
 {
     console.log("(CEX) " + msg);
@@ -79,6 +82,11 @@ function CreateConnection()
     function WebSocketSend(data)
     {
         if (ws !== null && ws.readyState === WebSocket.OPEN) {
+            sendCount = sendCount + 1;
+            var sendRate = sendCount / (Date.now() * 1000.0 - startTime);
+            if (sendRate > 1.0) {
+                Print("WARNING: rate limit above 1 per sec");
+            }
             ws.send(JSON.stringify(data));
         } 
     }
