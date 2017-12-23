@@ -9,14 +9,14 @@ const app = express();
 
 const sites = {
     "OKCoin": {
-        enabled: true,
+        enabled: false,
         module: okcoin,
         entryParser: function(entry) {
             return entry;
         }
     },
     "CEX": {
-        enabled: true,
+        enabled: false,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
@@ -27,7 +27,7 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: false,
+        enabled: true,
         module: kraken,
         entryParser: function(entry) {
             return entry;
@@ -43,8 +43,8 @@ const enabledCryptos = [
     "ETC",
     "ETH",
     "LTC",
-    "USDT",
-    "XMR",
+    //"USDT",
+    //"XMR",
     "XRP",
     "ZEC"
 ];
@@ -66,88 +66,61 @@ for (var site in sites) {
     sites[site].module.Start(pairs);
 }
 
-const frontEndPath = "public/data/";
-
 function InitFrontEnd()
 {
-    var enabledSites = [];
-    for (var site in sites) {
-        if (sites[site].enabled) {
-            enabledSites.push(site);
-        }
-    }
-    fs.writeFileSync(frontEndPath + "enabled",
-        JSON.stringify({
-            sites: enabledSites,
-            cryptos: enabledCryptos,
-            fiats: enabledFiats
-        })
-    );
-
     app.set("port", 8080);
     app.use(express.static(path.join(__dirname, "public")));
     app.listen(app.get("port"));
 
-    setInterval(function() {
+    // Serve enabled sites & currencies
+    app.get("/enabled", function(req, res) {
+        var enabledSites = [];
         for (var site in sites) {
-            if (!sites[site].enabled) continue;
-    
-            //console.log("Writing data for " + site);
-            for (var pair in sites[site].module.data) {
-                //console.log(site + ": reading data for " + pair);
-                var pairData = sites[site].module.data[pair];
-                var depth = {
-                    asks: [],
-                    bids: []
-                };
-                var keys;
-    
-                keys = pairData.asks.keys();
-                for (var i = 0; i < keys.length; i++) {
-                    var entry = pairData.asks.entry(keys[i]);
-                    depth.asks.push(sites[site].entryParser(entry));
-                }
-                keys = pairData.bids.keys();
-                for (var i = 0; i < keys.length; i++) {
-                    var entry = pairData.bids.entry(keys[i]);
-                    depth.bids.push(sites[site].entryParser(entry));
-                }
-    
-                var fileName = "depth-" + site + "-" + pair;
-                fs.writeFile(frontEndPath + fileName, JSON.stringify(depth), "utf8",
-                    function(err) {
-                        if (err) {
-                            console.log("Write failed for " + fileName);
-                            return;
-                        }
-                    }
-                );
+            if (sites[site].enabled) {
+                enabledSites.push(site);
             }
         }
-    }, 1000);
+        res.send({
+            sites: enabledSites,
+            cryptos: enabledCryptos,
+            fiats: enabledFiats
+        });
+    });
+
+    // Serve market depth data
+    app.get("/depth", function(req, res) {
+        var site = req.query.site;
+        var pair = req.query.pair;
+
+        if (!sites.hasOwnProperty(site)) {
+            res.sendStatus(404);
+            return;
+        }
+        if (!sites[site].module.data.hasOwnProperty(pair)) {
+            res.sendStatus(404);
+            return;
+        }
+
+        var pairData = sites[site].module.data[pair];
+        var depth = {
+            asks: [],
+            bids: []
+        };
+        var keys;
+
+        keys = pairData.asks.keys();
+        for (var i = 0; i < keys.length; i++) {
+            var entry = pairData.asks.entry(keys[i]);
+            depth.asks.push(sites[site].entryParser(entry));
+        }
+        keys = pairData.bids.keys();
+        for (var i = 0; i < keys.length; i++) {
+            var entry = pairData.bids.entry(keys[i]);
+            depth.bids.push(sites[site].entryParser(entry));
+        }
+        
+        res.send(depth);
+    });
 }
 
-function DeleteFolderRecursiveSync(path) {
-    if (fs.existsSync(path)) {
-        fs.readdirSync(path).forEach(function(file, index) {
-            var curPath = path + "/" + file;
-            if (fs.lstatSync(curPath).isDirectory()) {
-                // recurse
-                DeleteFolderRecursiveSync(curPath);
-            }
-            else {
-                // delete file
-                fs.unlinkSync(curPath);
-            }
-        });
-        fs.rmdirSync(path);
-    }
-}
-/*DeleteFolderRecursiveSync(frontEndPath);
-fs.mkdir(frontEndPath, function(err) {
-    if (err) {
-        console.log("Make dir failed for " + frontEndPath);
-        return;
-    }
-});*/
 InitFrontEnd();

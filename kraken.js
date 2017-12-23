@@ -23,11 +23,24 @@ var mktData = {
     // }
 };
 
+var pollTickerInterval = null;
+var POLL_TICKER_TIME = 0.2; // seconds
+
+var pollDepthInterval = null;
+// seconds it takes to refresh full market depth data for all currency pairs
+var POLL_DEPTH_TIME = 5.0;
+var nextPair = 0;
+
+// NOTE: these pair conversions don't support crypto-crypto pairs
+
 function StdPairToKraken(pair)
 {
     var p = pair.split("-");
     if (p[0] === "BCH" || p[0] === "DASH") {
         return p[0] + p[1];
+    }
+    if (p[0] === "BTC") {
+        return "XXBT" + "Z" + p[1];
     }
     if (p[0] === "USDT") {
         return p[0] + "Z" + p[1];
@@ -47,6 +60,9 @@ function KrakenPairToStd(pair)
     }
     if (pair.substring(0, 3) === "GNO") {
         return "GNO-" + pair.substring(3, pair.length);
+    }
+    if (pair.substring(0, 4) === "XXBT") {
+        return "BTC-" + pair.substring(5, pair.length);
     }
     if (pair.substring(0, 4) === "DASH") {
         return "DASH-" + pair.substring(4, pair.length);
@@ -117,11 +133,13 @@ function HandleResponse(res, callback)
     res.on("end", function() {
         try {
             data = JSON.parse(data);
-            callback(data);
         }
         catch (err) {
             Print("JSON parse error: " + err);
+            Print(data);
+            return;
         }
+        callback(data);
     });
 }
 
@@ -182,50 +200,104 @@ function SubmitPublicRequest(type, args, callback)
     });
 }
 
-/*SubmitPublicRequest("Time", {}, function(data) {
-    Print(data)
-});*/
-/*SubmitPublicRequest("Ticker", {
-    pair: "XXBTZUSD"
-}, function(data) {
-    Print(data);
-});*/
-/*SubmitPublicRequest("AssetPairs", {
-    //pair: "XXBTZUSD"
-}, function(data) {
-    Print(data);
-});*/
-/*SubmitPublicRequest("Depth", {
-    pair: "XXBTZUSD"
-}, function(data) {
-    Print(data.result.XXBTZUSD.asks)
-});*/
-/*SubmitPrivateRequest("Balance", {}, function(data) {
-    Print(data);
-});*/
+function ClearData(pair)
+{
+    mktData[pair].asks.clear();
+    mktData[pair].bids.clear();
+}
 
-var pollTickerInterval = null;
-var POLL_TICKER_TIME = 2; // seconds
-
-var pollDepthInterval = null;
-// seconds it takes to refresh full market depth data for all currency pairs
-var POLL_DEPTH_TIME = 15;
-
-function ProcessTickerData(data) {
+function ProcessDepthData(data)
+{
+    // Should only be one pair, but loop anyway I guess...
     for (var kPair in data) {
         var pair = KrakenPairToStd(kPair);
         if (pair === null) continue;
 
-        
+        ClearData(pair);
+        var asks = data[kPair].asks;
+        var bids = data[kPair].bids;
 
-        if (mktData[pair].asks.length > 0) {
-            while (true) {
-                break;
-                //if (parseFloat(mktData[pair].asks[0][0]) > )
+        for (var i = 0; i < asks.length; i++) {
+            var price = asks[i][0];
+            var volume = asks[i][1];
+            var time = asks[i][2];
+    
+            if (mktData[pair].asks.exists(price)) {
+                if (volume === 0) {
+                    mktData[pair].asks.delete(price);
+                }
+                else {
+                    mktData[pair].asks.set(price, [volume, time]);
+                }
+            }
+            else {
+                mktData[pair].asks.insert(price, [volume, time]);
             }
         }
-        mktData[pair].asks;
-        mktData[pair].bids;
+        for (var i = 0; i < bids.length; i++) {
+            var price = bids[i][0];
+            var volume = bids[i][1];
+            var time = bids[i][2];
+    
+            if (mktData[pair].bids.exists(price)) {
+                if (volume === 0) {
+                    mktData[pair].bids.delete(price);
+                }
+                else {
+                    mktData[pair].bids.set(price, [volume, time]);
+                }
+            }
+            else {
+                mktData[pair].bids.insert(price, [volume, time]);
+            }
+        }
+    }
+}
+
+function ProcessTickerData(data)
+{
+    for (var kPair in data) {
+        var pair = KrakenPairToStd(kPair);
+        if (pair === null) continue;
+
+        var asks = mktData[pair].asks;
+        var bids = mktData[pair].bids;
+
+        var minAskPrice = data[kPair].a[0];
+        var minAskVol = data[kPair].a[1];
+        var maxBidPrice = data[kPair].b[0];
+        var maxBidVol = data[kPair].b[1];
+
+        while (asks.length() > 0) {
+            var curMinAskPrice = asks.keys()[0];
+            if (parseFloat(curMinAskPrice) < parseFloat(minAskPrice)) {
+                asks.delete(curMinAskPrice);
+            }
+            else {
+                break;
+            }
+        }
+        if (asks.exists(minAskPrice)) {
+            asks.set(minAskPrice, [minAskVol, Date.now()]);
+        }
+        else {
+            asks.insert(minAskPrice, [minAskVol, Date.now()]);
+        }
+        while (bids.length() > 0) {
+            var curMaxBidPrice = bids.keys()[bids.length() - 1];
+            if (parseFloat(curMaxBidPrice) > parseFloat(maxBidPrice)) {
+                bids.delete(curMaxBidPrice);
+            }
+            else {
+                break;
+            }
+        }
+        if (bids.exists(maxBidPrice)) {
+            bids.set(maxBidPrice, [maxBidVol, Date.now()]);
+        }
+        else {
+            bids.insert(maxBidPrice, [maxBidVol, Date.now()]);
+        }
     }
 }
 
@@ -248,6 +320,22 @@ function StartDataPoll()
             ProcessTickerData(data.result);
         });
     }, POLL_TICKER_TIME * 1000);
+
+    var numPairs = Object.keys(mktData).length;
+    pollDepthInterval = setInterval(function() {
+        var pair = Object.keys(mktData)[nextPair];
+        nextPair = (nextPair + 1) % Object.keys(mktData).length;
+        SubmitPublicRequest("Depth", {
+            pair: StdPairToKraken(pair)
+        }, function(data) {
+            if (data.error.length > 0) {
+                Print("depth error");
+                return;
+            }
+
+            ProcessDepthData(data.result);
+        });
+    }, POLL_DEPTH_TIME * 1000.0 / numPairs);
 }
 
 function CompareFloatStrings(s1, s2)

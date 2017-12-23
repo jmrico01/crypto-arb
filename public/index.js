@@ -157,80 +157,86 @@ function ProcessDepthData(depth)
 var site = "";
 var pair = "";
 
-function StartDataSync()
+function FetchData()
 {
-    setInterval(function() {
-        var fileName = "depth-" + site + "-" + pair;
-        // TODO Handle no data (404) case.
-        $.ajax({
-            dataType: "json",
-            url: "data/" + fileName,
-            success: function(depth) {
-                console.log("Retrieved data for " + site + ", " + pair);
-                console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
-                $("#site").html(site);
-                $("#currencyPair").html(pair);
-                ProcessDepthData(depth);
-            },
-            error: function(req, status, err) {
-                console.log("No data for " + site + ", " + pair);
-                $("#site").html(site);
-                $("#currencyPair").html(pair);
-                SetAskBidDisplay(null);
-                ClearPlot();
-            }
-          });
-        /*$.getJSON("data/" + fileName, function(depth) {
+    $.ajax({
+        dataType: "json",
+        url: "depth?site=" + site + "&pair=" + pair,
+        success: function(depth) {
             console.log("Retrieved data for " + site + ", " + pair);
             console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
             $("#site").html(site);
             $("#currencyPair").html(pair);
             ProcessDepthData(depth);
-        });*/
-    }, 1000);
+        },
+        error: function(req, status, err) {
+            console.log("No data for " + site + ", " + pair);
+            $("#site").html(site);
+            $("#currencyPair").html(pair);
+            SetAskBidDisplay(null);
+            ClearPlot();
+        }
+    });
 }
 
 $(function() {
     // Generate buttons for sites, cryptos, fiats
-    $.getJSON("data/enabled", function(enabledInfo) {
-        var $bar2 = $("#bar2");
-        for (var i = 0; i < enabledInfo.sites.length; i++) {
-            $bar2.append("<button class=\"site\">"
-                + enabledInfo.sites[i] + "</button>");
-        }
-        $bar2.append("<br><br>");
-        for (var i = 0; i < enabledInfo.cryptos.length; i++) {
-            $bar2.append("<button class=\"crypto\">"
-                + enabledInfo.cryptos[i] + "</button>");
-        }
-        $bar2.append("<br><br>");
-        for (var i = 0; i < enabledInfo.fiats.length; i++) {
-            $bar2.append("<button class=\"fiat\">"
-                + enabledInfo.fiats[i] + "</button>");
-        }
-        
-        $(".site").click(function(event) {
-            var $target = $(event.target);
-            site = $target.html();
-            console.log("Selected site " + site);
-        });
-        $(".crypto").click(function(event) {
-            var $target = $(event.target);
-            pair = pair.split("-");
-            pair[0] = $target.html();
-            pair = pair.join("-");
-            console.log("Selected currencies: " + pair);
-        });
-        $(".fiat").click(function(event) {
-            var $target = $(event.target);
-            pair = pair.split("-");
-            pair[1] = $target.html();
-            pair = pair.join("-");
-            console.log("Selected currencies: " + pair);
-        });
+    $.ajax({
+        dataType: "json",
+        url: "enabled",
+        success: function(enabledInfo) {
+            var $bar2 = $("#bar2");
+            for (var i = 0; i < enabledInfo.sites.length; i++) {
+                $bar2.append("<button class=\"site\">"
+                    + enabledInfo.sites[i] + "</button>");
+            }
+            $bar2.append("<br><br>");
+            for (var i = 0; i < enabledInfo.cryptos.length; i++) {
+                $bar2.append("<button class=\"crypto\">"
+                    + enabledInfo.cryptos[i] + "</button>");
+            }
+            $bar2.append("<br><br>");
+            for (var i = 0; i < enabledInfo.fiats.length; i++) {
+                $bar2.append("<button class=\"fiat\">"
+                    + enabledInfo.fiats[i] + "</button>");
+            }
+            
+            $(".site").click(function(event) {
+                var $target = $(event.target);
+                site = $target.html();
+                console.log("Selected site " + site);
+                FetchData();
+            });
+            $(".crypto").click(function(event) {
+                var $target = $(event.target);
+                pair = pair.split("-");
+                pair[0] = $target.html();
+                pair = pair.join("-");
+                console.log("Selected currencies: " + pair);
+                FetchData();
+            });
+            $(".fiat").click(function(event) {
+                var $target = $(event.target);
+                pair = pair.split("-");
+                pair[1] = $target.html();
+                pair = pair.join("-");
+                console.log("Selected currencies: " + pair);
+                FetchData();
+            });
+    
+            site = "CEX";
+            if (enabledInfo.sites.indexOf("CEX") === -1) {
+                site = enabledInfo.sites[0];
+            }
+            pair = "BTC-USD";
+            FetchData();
 
-        site = "CEX";
-        pair = "BTC-USD";
-        StartDataSync();
+            setInterval(function() {
+                FetchData();
+            }, 1000);
+        },
+        error: function(req, status, err) {
+            console.log("Failed to get data/enabled info");
+        }
     });
 });
