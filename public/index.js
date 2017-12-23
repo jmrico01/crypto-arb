@@ -110,6 +110,7 @@ function SetAskBidDisplay(depth)
 function ProcessDepthData(depth)
 {
     if (depth.asks.length === 0 || depth.bids.length === 0) {
+        ClearPlot();
         SetAskBidDisplay(null);
         return;
     }
@@ -161,13 +162,31 @@ function StartDataSync()
     setInterval(function() {
         var fileName = "depth-" + site + "-" + pair;
         // TODO Handle no data (404) case.
-        $.getJSON("data/" + fileName, function(depth) {
+        $.ajax({
+            dataType: "json",
+            url: "data/" + fileName,
+            success: function(depth) {
+                console.log("Retrieved data for " + site + ", " + pair);
+                console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
+                $("#site").html(site);
+                $("#currencyPair").html(pair);
+                ProcessDepthData(depth);
+            },
+            error: function(req, status, err) {
+                console.log("No data for " + site + ", " + pair);
+                $("#site").html(site);
+                $("#currencyPair").html(pair);
+                SetAskBidDisplay(null);
+                ClearPlot();
+            }
+          });
+        /*$.getJSON("data/" + fileName, function(depth) {
             console.log("Retrieved data for " + site + ", " + pair);
             console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
             $("#site").html(site);
             $("#currencyPair").html(pair);
             ProcessDepthData(depth);
-        });
+        });*/
     }, 1000);
 }
 
