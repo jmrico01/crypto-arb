@@ -10,6 +10,57 @@ var sellMatrix = {};
 var fracProfit = {};
 var flatProfit = {};
 
+var fees = {
+    "OKCoin": {
+        "deposit": {
+            // NO FIAT DEPOSITS :(
+        },
+        "withdraw": {
+            //"BTC": [0.0, ]
+        },
+        "taker": [0.20, 0.0],
+        "maker": [0.20, 0.0]
+    },
+    "CEX": {
+        "deposit": {
+            "USD": [3.5, 0.25]
+        },
+        "withdraw": {
+            "USD": [0.0, 3.8],
+        },
+        "taker": [0.25, 0.0],
+        "maker": [0.16, 0.0]
+    },
+    "Kraken": {
+        "deposit": {
+            "USD": [0.0, 5.00] // either $5 or $10...
+        },
+        "withdraw": {
+            "USD": [0.0, 5.00], // or maybe $50...
+
+            "BTC": [0.0, 0.001],
+            "ETH": [0.0, 0.005],
+            "XRP": [0.0, 0.02],
+            "XLM": [0.0, 0.00002],
+            "LTC": [0.0, 0.02],
+            "XDG": [0.0, 2.00],
+            "ZEC": [0.0, 0.0001],
+            "ICN": [0.0, 0.2],
+            "REP": [0.0, 0.01],
+            "ETC": [0.0, 0.005],
+            "MLN": [0.0, 0.003],
+            "XMR": [0.0, 0.05],
+            "DASH": [0.0, 0.005],
+            "GNO": [0.0, 0.01],
+            "USDT": [0.0, 5.00],
+            "EOS": [0.0, 0.5],
+            "BCH": [0.0, 0.001]
+        },
+        "taker": [0.26, 0.0],
+        "maker": [0.16, 0.0]
+    }
+}
+
 // Return a list, sorted by fracProfit. An entry looks like this:
 // [
 //     fracProfit, flatProfit,

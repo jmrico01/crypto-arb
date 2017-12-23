@@ -18,13 +18,41 @@ Maker: 0.16%
 OKCoin
 -------------------------------------------------------------------------------
 USD Deposit/Withdrawal: NONE
+ETH Withdrawal: 0.01 ETH ~ $7
+BCH Withdrawal: max 0.002 BCH ~ $6
 Taker: 0.20%
 Maker: 0.20%
+
+OKEx
+-------------------------------------------------------------------------------
+https://smsreceivefree.com/info/14378003342/
 
 Kraken
 -------------------------------------------------------------------------------
 (almost verified)
 
+USD Deposit (Domestic): $5
+USD Deposit (SWIFT): $10
+WITHDRAWALS
+(https://support.kraken.com/hc/en-us/articles/201893608-What-are-the-withdrawal-fees-)
+Bitcoin (XBT) - ฿0.001
+Ether (ETH) - Ξ0.005
+Ripple (XRP) - Ʀ0.02
+Stellar (XLM) - *0.00002
+Litecoin (LTC) - Ł0.02
+Dogecoin (XDG) - Ð2.00
+Zcash (ZEC) - ⓩ0.00010
+Iconomi (ICN) - ICN 0.2
+Augur (REP) - Ɍ0.01
+Ether Classic (ETC) - ξ0.005
+Melonport (MLN) - M0.003
+Monero (XMR) - ɱ0.05
+Dash (DASH) - Đ0.005
+Dash Instant - Đ0.01
+Gnosis (GNO) - Ğ0.01
+Tether (USDT) - USD₮ 5
+EOS (EOS) - Ȅ0.50000
+Bitcoin Cash (BCH) - ฿0.001
 Taker: 0.26%
 Maker: 0.16%
 
