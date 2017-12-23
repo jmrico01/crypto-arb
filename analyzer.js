@@ -109,6 +109,23 @@ function ProfitsPastThreshold(thresholdFrac)
     }
 }
 
+// How much profit, including fees, will we obtain
+// if we were to buy the first currency in "pair"
+// at sitePair[0], and sell it at sitePair[1]?
+// Returns [fractional, flat], or null on error
+function CalcProfit(pair, sitePair)
+{
+    // What we care about is BUYING from site1, SELLING on site2
+    // Is there a profit there? How much?
+    var pairBuy1 = buyMatrix[pair][sitePair[0]];
+    var pairSell2 = sellMatrix[pair][sitePair[1]];
+    if (pairBuy1 === null || pairSell2 === null) {
+        return null
+    }
+
+    return [(pairSell2 - pairBuy1) / pairBuy1, pairSell2 - pairBuy1];
+}
+
 // This function updates buyMatrix, sellMatrix, fracProfit, and flatProfit
 function Analyze()
 {
@@ -141,21 +158,14 @@ function Analyze()
     }
 
     for (var i = 0; i < pairs.length; i++) {
-        // For each currency pair
-        var pairBuy = buyMatrix[pairs[i]];
-        var pairSell = sellMatrix[pairs[i]];
         for (var j = 0; j < sitePairs.length; j++) {
-            // For each site pair
-            var sitePair = sitePairs[j].split("->");
-            // What we care about is BUYING from site1, SELLING on site2
-            // Is there a profit there? How much?
-            var pairBuy1 = pairBuy[sitePair[0]];
-            var pairSell2 = pairSell[sitePair[1]];
-            if (pairBuy1 === null || pairSell2 === null) {
+            var profit = CalcProfit(pairs[i], sitePairs[j].split("->"));
+            if (profit === null) {
                 continue;
             }
-            fracProfit[pairs[i]][sitePairs[j]] = (pairSell2 - pairBuy1) / pairBuy1;
-            flatProfit[pairs[i]][sitePairs[j]] = pairSell2 - pairBuy1;
+            
+            fracProfit[pairs[i]][sitePairs[j]] = profit[0];
+            flatProfit[pairs[i]][sitePairs[j]] = profit[1];
         }
     }
 }
