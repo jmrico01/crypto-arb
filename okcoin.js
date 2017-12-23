@@ -224,7 +224,7 @@ function Start(pairs)
         "LTC",
         "ETH",
         "ETC",
-        "BCC"
+        "BCH"
     ];
     var supportedFiats = [
         "USD"

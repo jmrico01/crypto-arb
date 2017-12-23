@@ -195,7 +195,6 @@ function CreateConnection()
             else {
                 mktData[pair].asks.insert(price, [volume, time]);
             }
-            break;
         }
         for (var i = 0; i < data.bids.length; i++) {
             var price = data.bids[i][0];
@@ -212,7 +211,6 @@ function CreateConnection()
             else {
                 mktData[pair].bids.insert(price, [volume, time]);
             }
-            break;
         }
     }
     

@@ -229,8 +229,8 @@ $(function() {
             console.log("Selected currencies: " + pair);
         });
 
-        site = enabledInfo.sites[0];
-        pair = enabledInfo.cryptos[0] + "-" + enabledInfo.fiats[0];
+        site = "CEX";
+        pair = "BTC-USD";
         StartDataSync();
     });
 });
