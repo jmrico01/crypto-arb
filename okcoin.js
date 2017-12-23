@@ -30,8 +30,12 @@ function CreateConnection()
 {
     var ws = null;
 
-    var checkConnInterval = null;
-    var CHECK_CONN_TIME = 5; // secs
+    // OKCoin expects heartbeat pings every ~30secs (see API)
+    var heartbeatInterval = null;
+    var HEARTBEAT_TIME = 10; // secs
+
+    // Reset connection and reload data every so often.
+    var RESET_CONN_TIME = 40; // secs
 
     function ClearData(pair)
     {
@@ -65,6 +69,10 @@ function CreateConnection()
                 ws.terminate();
             }
             ws = null;
+        }
+        if (heartbeatInterval !== null) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
         }
 
         ClearData();
@@ -182,9 +190,13 @@ function CreateConnection()
         }
 
         // Send heartbeats
-        setInterval(function() {
+        heartbeatInterval = setInterval(function() {
             WebSocketSend({ event: "ping" });
-        }, 10 * 1000)
+        }, HEARTBEAT_TIME * 1000)
+
+        setTimeout(function() {
+            Close();
+        }, RESET_CONN_TIME * 1000);
     });
     ws.on("close", function(code, reason) {
         Print("connection closed, code " + code);

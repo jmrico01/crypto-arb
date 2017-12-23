@@ -127,7 +127,7 @@ function CreateConnection()
     
     function RequestRebuild(pair)
     {
-        Print((new Date(Date.now())).toTimeString() + ": Request rebuild for " + pair);
+        //Print((new Date(Date.now())).toTimeString() + ": Request rebuild for " + pair);
         if (pair === undefined || pair === null) {
             for (var p in mktData) {
                 var unsub = {
@@ -236,10 +236,10 @@ function CreateConnection()
             }
         }
         
-        Print((new Date(Date.now())).toTimeString() + ": Cleared order book for " + msg.data.pair);
+        //Print((new Date(Date.now())).toTimeString() + ": Cleared order book for " + msg.data.pair);
         ClearData(msg.data.pair.replace(":", "-"));
     
-        Print((new Date(Date.now())).toTimeString() + ": Resubscribing for " + msg.data.pair);
+        //Print((new Date(Date.now())).toTimeString() + ": Resubscribing for " + msg.data.pair);
         var orderBookSub = {
             "e": "order-book-subscribe",
             "data": {

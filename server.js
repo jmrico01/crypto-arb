@@ -93,12 +93,12 @@ function InitFrontEnd()
     
                 keys = pairData.asks.keys();
                 for (var i = 0; i < keys.length; i++) {
-                    var entry = [keys[i], pairData.asks.val(keys[i])];
+                    var entry = pairData.asks.entry(keys[i]);
                     depth.asks.push(sites[site].entryParser(entry));
                 }
                 keys = pairData.bids.keys();
                 for (var i = 0; i < keys.length; i++) {
-                    var entry = [keys[i], pairData.bids.val(keys[i])];
+                    var entry = pairData.bids.entry(keys[i]);
                     depth.bids.push(sites[site].entryParser(entry));
                 }
     

@@ -57,6 +57,12 @@ function MakeOrderedHash(cmpFunc) {
             }
             vals[k] = v;
         },
+        entry:  function(k) {
+            return [k, vals[k]];
+        },
+        entryByIndex:  function(idx) {
+            return [keys[idx], vals[keys[idx]]];
+        },
         val:    function(k) { return vals[k] },
         length: function()  { return keys.length },
         keys:   function()  { return keys },
