@@ -1,106 +1,64 @@
-const fs = require("fs");
-const cex = require("./cex");
-const okcoin = require("./okcoin");
-const kraken = require("./kraken");
+const UPDATE_TIME = 1; // seconds
 
-const path = require("path");
-const express = require("express");
-const app = express();
-
-const sites = {
-    "OKCoin": {
-        enabled: true,
-        module: okcoin,
-        entryParser: function(entry) {
-            return entry;
-        }
-    },
-    "CEX": {
-        enabled: true,
-        module: cex,
-        entryParser: function(entry) {
-            const DECIMALS = 4;
-            return [
-                entry[0].toFixed(DECIMALS),
-                [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
-            ];
-        }
-    },
-    "Kraken": {
-        enabled: true,
-        module: kraken,
-        entryParser: function(entry) {
-            return entry;
-        }
-    }
-};
-
-const enabledCryptos = [
-    "BCH",
-    "BTC",
-    "BTG",
-    "DASH",
-    "ETC",
-    "ETH",
-    "LTC",
-    //"USDT",
-    //"XMR",
-    "XRP",
-    "ZEC"
-];
-const enabledFiats = [
-    "USD"
-];
-
+var sites = {};
 var pairs = [];
-for (var i = 0; i < enabledFiats.length; i++) {
-    for (var j = 0; j < enabledCryptos.length; j++) {
-        pairs.push(enabledCryptos[j] + "-" + enabledFiats[i]);
-    }
-}
-
-for (var site in sites) {
-    if (!sites[site].enabled) continue;
-
-    console.log("starting " + site);
-    sites[site].module.Start(pairs);
-}
-
-const UPDATE_TIME = 1000; // ms
+var sitePairs = [];
 
 var buyMatrix = {};
 var sellMatrix = {};
-// Initialize matrices to null to detect unavailable data
-for (var i = 0; i < pairs.length; i++) {
-    buyMatrix[pairs[i]] = {};
-    sellMatrix[pairs[i]] = {};
-    for (var site in sites) {
-        buyMatrix[pairs[i]][site] = null;
-        sellMatrix[pairs[i]][site] = null;
-    }
-}
-
-var sitePairs = [];
-for (var site1 in sites) {
-    for (var site2 in sites) {
-        if (site1 === site2) {
-            continue;
-        }
-        sitePairs.push(site1 + "->" + site2);
-    }
-}
 
 var fracProfit = {};
 var flatProfit = {};
-for (var i = 0; i < pairs.length; i++) {
-    fracProfit[pairs[i]] = {};
-    flatProfit[pairs[i]] = {};
-    for (var j = 0; j < sitePairs.length; j++) {
-        fracProfit[pairs[i]][sitePairs[j]] = null;
-        flatProfit[pairs[i]][sitePairs[j]] = null;
+
+// Return a list, sorted by fracProfit. An entry looks like this:
+// [
+//     fracProfit, flatProfit,
+//     currencyPair
+//     siteBuy, siteBuyPrice,
+//     siteSell, siteSellPrice
+// ]
+function ProfitsPastThreshold(thresholdFrac)
+{
+    var pastThreshold = [];
+    for (var i = 0; i < pairs.length; i++) {
+        for (var j = 0; j < sitePairs.length; j++) {
+            var fracProf = fracProfit[pairs[i]][sitePairs[j]];
+            if (fracProf >= thresholdFrac) {
+                var sitesSplit = sitePairs[j].split("->");
+
+                var entry = [
+                    fracProf, flatProfit[pairs[i]][sitePairs[j]],
+                    pairs[i],
+                    sitesSplit[0], buyMatrix[pairs[i]][sitesSplit[0]],
+                    sitesSplit[1], sellMatrix[pairs[i]][sitesSplit[1]]
+                ];
+                pastThreshold.push(entry);
+            }
+        }
+    }
+
+    pastThreshold.sort(function(a, b) {
+        // Sort descending
+        if (a[0] < b[0])        return 1;
+        else if (a[0] > b[0])   return -1;
+        else                    return 0;
+    });
+
+    return pastThreshold;
+    //console.log(fracProfit["ETH-USD"]);
+    //console.log(flatProfit["ETH-USD"]);
+
+    console.log("Differentials past " + thresholdFrac * 100.0 + "%:");
+    for (var i = 0; i < pastThreshold.length; i++) {
+        var currencyPair = pairs[pastThreshold[i][0]];
+        var sitePair = sitePairs[pastThreshold[i][1]];
+        var percentage = fracProfit[currencyPair][sitePair] * 100.0;
+        console.log("Trade " + currencyPair + " thru sites " + sitePair);
+        console.log("    ( " + percentage.toFixed(4) + " % )");
     }
 }
 
+// This function updates buyMatrix, sellMatrix, fracProfit, and flatProfit
 function Analyze()
 {
     for (var site in sites) {
@@ -148,28 +106,46 @@ function Analyze()
             fracProfit[pairs[i]][sitePairs[j]] = (pairSell2 - pairBuy1) / pairBuy1;
             flatProfit[pairs[i]][sitePairs[j]] = pairSell2 - pairBuy1;
         }
-    }   
-    
-    var thresholdFrac = 0.05;
-    var pastThreshold = [];
-    for (var i = 0; i < pairs.length; i++) {
-        for (var j = 0; j < sitePairs.length; j++) {
-            if (fracProfit[pairs[i]][sitePairs[j]] >= thresholdFrac) {
-                pastThreshold.push([i, j]);
-            }
-        }
-    }
-    //console.log(fracProfit["ETH-USD"]);
-    //console.log(flatProfit["ETH-USD"]);
-
-    console.log("Differentials past " + thresholdFrac * 100.0 + "%:");
-    for (var i = 0; i < pastThreshold.length; i++) {
-        var currencyPair = pairs[pastThreshold[i][0]];
-        var sitePair = sitePairs[pastThreshold[i][1]];
-        var percentage = fracProfit[currencyPair][sitePair] * 100.0;
-        console.log("Trade " + currencyPair + " thru sites " + sitePair);
-        console.log("    ( " + percentage.toFixed(4) + " % )");
     }
 }
 
-setInterval(Analyze, UPDATE_TIME);
+function Start(sitesIn, pairsIn)
+{
+    sites = sitesIn;
+    pairs = pairsIn;
+
+    // Initialize matrices to null to detect unavailable data
+    for (var i = 0; i < pairs.length; i++) {
+        buyMatrix[pairs[i]] = {};
+        sellMatrix[pairs[i]] = {};
+        for (var site in sites) {
+            buyMatrix[pairs[i]][site] = null;
+            sellMatrix[pairs[i]][site] = null;
+        }
+    }
+    
+    for (var site1 in sites) {
+        for (var site2 in sites) {
+            if (site1 === site2) {
+                continue;
+            }
+            sitePairs.push(site1 + "->" + site2);
+        }
+    }
+    
+    for (var i = 0; i < pairs.length; i++) {
+        fracProfit[pairs[i]] = {};
+        flatProfit[pairs[i]] = {};
+        for (var j = 0; j < sitePairs.length; j++) {
+            fracProfit[pairs[i]][sitePairs[j]] = null;
+            flatProfit[pairs[i]][sitePairs[j]] = null;
+        }
+    }
+
+    setInterval(Analyze, UPDATE_TIME * 1000);
+}
+
+exports.Start = Start;
+exports.fracProfit = fracProfit;
+exports.flatProfit = flatProfit;
+exports.PastThreshold = ProfitsPastThreshold;

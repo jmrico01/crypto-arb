@@ -13,6 +13,34 @@
         <script src="index.js"></script>
     </head>
     <body>
+        <div style="width: 100%; text-align: center;">
+            <h1>Top Profits (Ignoring Fees, For Now)</h1>
+        </div>
+        <div id="profits">
+            <div id="pBar1">
+                <!-- profit entry prototype, duplicated by index.js -->
+                <div id="profitProto" class="profitEntry">
+                    <div class="profitPercentage">
+                        <span class="profitCrypto">???</span> -
+                        <span class="profitPerc">X</span>%
+                    </div>
+                    <div class="profitBuyText">
+                        <span class="profitSite1">Site1</span>
+                        ( $<span class="profitSite1Price">X</span> )
+                    </div>
+                    <div class="profitSellText">
+                        <span class="profitSite2">Site2</span>
+                        ( $<span class="profitSite2Price">X</span> )
+                    </div>
+                </div>
+            </div>
+            <div id="pBar2"></div>
+            <div id="pBar3"></div>
+        </div>
+        <hr>
+        <div style="width: 100%; text-align: center; margin-top:2px;">
+            <h1>Market Data</h1>
+        </div>
         <div id="topBar">
             <div id="bar1">
                 <div class="textLine">
@@ -25,6 +53,7 @@
                 </div>
             </div>
             <div id="bar2">
+                <!-- Filled in with server data in index.js -->
             </div>
             <div id="bar3">
                 <div id="minAskText" class="textLine">

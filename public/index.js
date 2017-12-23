@@ -1,3 +1,5 @@
+const N_PROFITS = 6;
+
 function ClearPlot()
 {
     d3.select("svg").remove();
@@ -29,7 +31,7 @@ function Plot(datasets, xMin, xMax)
 
     var margin = {top: 20, right: 60, bottom: 20, left: 60};
     var width = 900 - margin.left - margin.right;
-    var height = 450 - margin.top - margin.bottom;
+    var height = 400 - margin.top - margin.bottom;
     
     var xScale = d3.scale.linear()
         .domain([xMin, xMax])
@@ -58,6 +60,7 @@ function Plot(datasets, xMin, xMax)
         .y(function(d) { return yScale(d[1]); });
 
     var svg = d3.select("body").append("svg")
+        .attr("class", "depthPlot")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
@@ -157,14 +160,37 @@ function ProcessDepthData(depth)
 var site = "";
 var pair = "";
 
+// Entry format (from analyzer.js):
+// [
+//     fracProfit, flatProfit,
+//     currencyPair
+//     siteBuy, siteBuyPrice,
+//     siteSell, siteSellPrice
+// ]
+function ProcessProfitData(profits)
+{
+    for (var i = 0; i < N_PROFITS; i++) {
+        var $pEntry = $("#profit" + i);
+        var profitPerc = profits[i][0] * 100.0;
+        var crypto = profits[i][2].split("-")[0];
+        $pEntry.find(".profitCrypto").html(crypto);
+        $pEntry.find(".profitPerc").html(profitPerc.toFixed(2));
+        $pEntry.find(".profitSite1").html(profits[i][3]);
+        $pEntry.find(".profitSite1Price").html(profits[i][4].toFixed(2));
+        $pEntry.find(".profitSite2").html(profits[i][5]);
+        $pEntry.find(".profitSite2Price").html(profits[i][6].toFixed(2));
+    }
+}
+
 function FetchData()
 {
+    // Get market depth data.
     $.ajax({
         dataType: "json",
         url: "depth?site=" + site + "&pair=" + pair,
         success: function(depth) {
-            console.log("Retrieved data for " + site + ", " + pair);
-            console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
+            //console.log("Retrieved data for " + site + ", " + pair);
+            //console.log("asks: " + depth.asks.length + ", bids: " + depth.bids.length);
             $("#site").html(site);
             $("#currencyPair").html(pair);
             ProcessDepthData(depth);
@@ -177,6 +203,18 @@ function FetchData()
             ClearPlot();
         }
     });
+
+    // Get best profits data.
+    $.ajax({
+        dataType: "json",
+        url: "profits?threshold=0.05",
+        success: function(pastThreshold) {
+            ProcessProfitData(pastThreshold);
+        },
+        error: function(req, status, err) {
+            console.log("No profits data");
+        }
+    })
 }
 
 $(function() {
@@ -239,4 +277,17 @@ $(function() {
             console.log("Failed to get data/enabled info");
         }
     });
+
+    // Generate profit fields
+    var $profitProto = $("#profitProto");
+    var profitEntry = $("#profitProto").html();
+    var profitEntryClass = $profitProto.attr("class");
+    $profitProto.remove();
+    for (var i = 0; i < N_PROFITS; i++) {
+        var barNum = (i % 3) + 1;
+        $("#pBar" + barNum).append(
+            "<div id=\"profit" + i + "\" class=\"" + profitEntryClass + "\">"
+            + profitEntry
+            + "</div>");
+    }
 });

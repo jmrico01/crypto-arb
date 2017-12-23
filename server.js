@@ -1,11 +1,13 @@
 const fs = require("fs");
+const path = require("path");
+const express = require("express");
+const app = express();
+
 const cex = require("./cex");
 const okcoin = require("./okcoin");
 const kraken = require("./kraken");
 
-const path = require("path");
-const express = require("express");
-const app = express();
+const analyzer = require("./analyzer");
 
 const sites = {
     "OKCoin": {
@@ -19,7 +21,7 @@ const sites = {
         enabled: true,
         module: cex,
         entryParser: function(entry) {
-            const DECIMALS = 4;
+            const DECIMALS = 2;
             return [
                 entry[0].toFixed(DECIMALS),
                 [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
@@ -59,6 +61,7 @@ for (var i = 0; i < enabledFiats.length; i++) {
     }
 }
 
+// Start site modules, which pull in data from each API
 for (var site in sites) {
     if (!sites[site].enabled) continue;
 
@@ -66,61 +69,64 @@ for (var site in sites) {
     sites[site].module.Start(pairs);
 }
 
-function InitFrontEnd()
-{
-    app.set("port", 8080);
-    app.use(express.static(path.join(__dirname, "public")));
-    app.listen(app.get("port"));
+// Start the analyzer
+analyzer.Start(sites, pairs);
 
-    // Serve enabled sites & currencies
-    app.get("/enabled", function(req, res) {
-        var enabledSites = [];
-        for (var site in sites) {
-            if (sites[site].enabled) {
-                enabledSites.push(site);
-            }
+app.set("port", 8080);
+app.use(express.static(path.join(__dirname, "public")));
+app.listen(app.get("port"));
+
+// Serve enabled sites & currencies
+app.get("/enabled", function(req, res) {
+    var enabledSites = [];
+    for (var site in sites) {
+        if (sites[site].enabled) {
+            enabledSites.push(site);
         }
-        res.send({
-            sites: enabledSites,
-            cryptos: enabledCryptos,
-            fiats: enabledFiats
-        });
+    }
+    res.send({
+        sites: enabledSites,
+        cryptos: enabledCryptos,
+        fiats: enabledFiats
     });
+});
 
-    // Serve market depth data
-    app.get("/depth", function(req, res) {
-        var site = req.query.site;
-        var pair = req.query.pair;
+// Serve market depth data
+app.get("/depth", function(req, res) {
+    var site = req.query.site;
+    var pair = req.query.pair;
 
-        if (!sites.hasOwnProperty(site)) {
-            res.sendStatus(404);
-            return;
-        }
-        if (!sites[site].module.data.hasOwnProperty(pair)) {
-            res.sendStatus(404);
-            return;
-        }
+    if (!sites.hasOwnProperty(site)) {
+        res.sendStatus(404);
+        return;
+    }
+    if (!sites[site].module.data.hasOwnProperty(pair)) {
+        res.sendStatus(404);
+        return;
+    }
 
-        var pairData = sites[site].module.data[pair];
-        var depth = {
-            asks: [],
-            bids: []
-        };
-        var keys;
+    var pairData = sites[site].module.data[pair];
+    var depth = {
+        asks: [],
+        bids: []
+    };
+    var keys;
 
-        keys = pairData.asks.keys();
-        for (var i = 0; i < keys.length; i++) {
-            var entry = pairData.asks.entry(keys[i]);
-            depth.asks.push(sites[site].entryParser(entry));
-        }
-        keys = pairData.bids.keys();
-        for (var i = 0; i < keys.length; i++) {
-            var entry = pairData.bids.entry(keys[i]);
-            depth.bids.push(sites[site].entryParser(entry));
-        }
-        
-        res.send(depth);
-    });
-}
+    keys = pairData.asks.keys();
+    for (var i = 0; i < keys.length; i++) {
+        var entry = pairData.asks.entry(keys[i]);
+        depth.asks.push(sites[site].entryParser(entry));
+    }
+    keys = pairData.bids.keys();
+    for (var i = 0; i < keys.length; i++) {
+        var entry = pairData.bids.entry(keys[i]);
+        depth.bids.push(sites[site].entryParser(entry));
+    }
+    
+    res.send(depth);
+});
 
-InitFrontEnd();
+app.get("/profits", function (req, res) {
+    var threshold = parseFloat(req.query.threshold);
+    res.send(analyzer.PastThreshold(threshold));
+});

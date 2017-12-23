@@ -1,3 +1,49 @@
+html {
+    margin: 5px;
+    padding: 0;
+}
+body {
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    font-size: 22pt;
+}
+
+#profits {
+    width: 100%;
+    height: 150pt;
+    text-align: center;
+    font-size: 14pt;
+}
+#pBar1 {
+    float: left;
+    width: 33.333%;
+}
+#pBar2 {
+    float: left;
+    width: 33.333%;
+}
+#pBar3 {
+    float: left;
+    width: 33.333%;
+}
+
+.profitEntry {
+    margin-bottom: 20px;
+}
+.profitPercentage {
+    font-weight: bold;
+    font-size: 16pt;
+}
+.profitBuyText {
+    color: #7a0707;
+}
+.profitSellText {
+    color: #137a13;
+}
+
 #topBar {
     width: 100%;
     height: 120px;
@@ -33,6 +79,12 @@
 }
 #site, #currencyPair, #minAsk, #maxBid {
     font-weight: bold;
+}
+
+.depthPlot {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .axis path,
