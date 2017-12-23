@@ -1,6 +1,7 @@
 const fs = require("fs");
 const cex = require("./cex");
 const okcoin = require("./okcoin");
+const kraken = require("./kraken");
 
 const path = require("path");
 const express = require("express");
@@ -24,16 +25,26 @@ const sites = {
                 [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
             ];
         }
+    },
+    "Kraken": {
+        enabled: true,
+        module: kraken,
+        entryParser: function(entry) {
+            return entry;
+        }
     }
 };
 
 const enabledCryptos = [
-    "BTC",
-    "ETH",
     "BCH",
-    "LTC",
+    "BTC",
     "BTG",
     "DASH",
+    "ETC",
+    "ETH",
+    "LTC",
+    //"USDT",
+    //"XMR",
     "XRP",
     "ZEC"
 ];
