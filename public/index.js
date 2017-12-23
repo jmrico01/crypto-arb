@@ -223,30 +223,56 @@ $(function() {
         dataType: "json",
         url: "enabled",
         success: function(enabledInfo) {
+            var initSite = "CEX";
+            var initCrypto = "BTC";
+            var initFiat = "USD";
+            if (enabledInfo.sites.indexOf(initSite) === -1) {
+                initSite = enabledInfo.sites[0];
+            }
+
             var $bar2 = $("#bar2");
             for (var i = 0; i < enabledInfo.sites.length; i++) {
-                $bar2.append("<button class=\"site\">"
+                var $new = $("<button class=\"site\">" 
                     + enabledInfo.sites[i] + "</button>");
+                $bar2.append($new);
+
+                if (enabledInfo.sites[i] === initSite) {
+                    $new.addClass("buttonSelected");
+                }
             }
             $bar2.append("<br><br>");
             for (var i = 0; i < enabledInfo.cryptos.length; i++) {
-                $bar2.append("<button class=\"crypto\">"
+                var $new = $("<button class=\"crypto\">"
                     + enabledInfo.cryptos[i] + "</button>");
+                $bar2.append($new);
+
+                if (enabledInfo.cryptos[i] === initCrypto) {
+                    $new.addClass("buttonSelected");
+                }
             }
             $bar2.append("<br><br>");
             for (var i = 0; i < enabledInfo.fiats.length; i++) {
-                $bar2.append("<button class=\"fiat\">"
+                var $new = $("<button class=\"fiat\">"
                     + enabledInfo.fiats[i] + "</button>");
+                $bar2.append($new);
+
+                if (enabledInfo.fiats[i] === initFiat) {
+                    $new.addClass("buttonSelected");
+                }
             }
             
             $(".site").click(function(event) {
+                $(".site").removeClass("buttonSelected");
                 var $target = $(event.target);
+                $target.addClass("buttonSelected");
                 site = $target.html();
                 console.log("Selected site " + site);
                 FetchData();
             });
             $(".crypto").click(function(event) {
+                $(".crypto").removeClass("buttonSelected");
                 var $target = $(event.target);
+                $target.addClass("buttonSelected");
                 pair = pair.split("-");
                 pair[0] = $target.html();
                 pair = pair.join("-");
@@ -254,19 +280,18 @@ $(function() {
                 FetchData();
             });
             $(".fiat").click(function(event) {
+                $(".fiat").removeClass("buttonSelected");
                 var $target = $(event.target);
+                $target.addClass("buttonSelected");
                 pair = pair.split("-");
                 pair[1] = $target.html();
                 pair = pair.join("-");
                 console.log("Selected currencies: " + pair);
                 FetchData();
             });
-    
-            site = "CEX";
-            if (enabledInfo.sites.indexOf("CEX") === -1) {
-                site = enabledInfo.sites[0];
-            }
-            pair = "BTC-USD";
+
+            site = initSite;
+            pair = initCrypto + "-" + initFiat;
             FetchData();
 
             setInterval(function() {
