@@ -1,4 +1,5 @@
 const N_PROFITS = 6;
+const PROFIT_THRESHOLD = 0.0;
 
 function ClearPlot()
 {
@@ -214,8 +215,9 @@ function FetchData()
     // Get best profits data.
     $.ajax({
         dataType: "json",
-        url: "profits?threshold=0.05",
+        url: "profits?threshold=" + PROFIT_THRESHOLD.toString(),
         success: function(pastThreshold) {
+            console.log(pastThreshold);
             ProcessProfitData(pastThreshold);
         },
         error: function(req, status, err) {

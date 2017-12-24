@@ -80,6 +80,8 @@ function ProfitsPastThreshold(thresholdFrac)
     for (var i = 0; i < pairs.length; i++) {
         for (var j = 0; j < sitePairs.length; j++) {
             var fracProf = fracProfit[pairs[i]][sitePairs[j]];
+            if (fracProf === null) continue;
+
             if (fracProf >= thresholdFrac) {
                 var sitesSplit = sitePairs[j].split("->");
 
@@ -140,7 +142,7 @@ function CalcProfit(pair, sitePair)
     var pairBuy1 = buyMatrix[pair][sitePair[0]];
     var pairSell2 = sellMatrix[pair][sitePair[1]];
     if (pairBuy1 === null || pairSell2 === null) {
-        return null
+        return [null, null];
     }
 
     var siteBuy = sitePair[0];
@@ -215,7 +217,7 @@ function CalcProfit(pair, sitePair)
     }
     fracProf -= 1.0;
     
-    if (!complete) return null;
+    if (!complete) return [null, null];
 
     // test
     /*var inputs = [100.0, 1000.0, 10000.0];
@@ -265,10 +267,8 @@ function Analyze()
     for (var i = 0; i < pairs.length; i++) {
         for (var j = 0; j < sitePairs.length; j++) {
             var profit = CalcProfit(pairs[i], sitePairs[j].split("->"));
-            if (profit === null) {
-                continue;
-            }
 
+            // profit can be [null, null], which is good
             fracProfit[pairs[i]][sitePairs[j]] = profit[0];
             flatFees[pairs[i]][sitePairs[j]] = profit[1];
         }
