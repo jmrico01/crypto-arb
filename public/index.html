@@ -14,7 +14,7 @@
     </head>
     <body>
         <div style="width: 100%; text-align: center;">
-            <h1>Top Profits (Ignoring Fees, For Now)</h1>
+            <h1>Top Profits</h1>
         </div>
         <div id="profits">
             <div id="pBar1">
@@ -23,6 +23,7 @@
                     <div class="profitPercentage">
                         <span class="profitCrypto">???</span> :
                         <span class="profitPerc">X</span>%
+                        ( -$<span class="profitFlatFee">X</span> )
                     </div>
                     <div class="profitBuyText">
                         <span class="profitSite1">Site1</span>
@@ -32,11 +33,23 @@
                         <span class="profitSite2">Site2</span>
                         ( $<span class="profitSite2Price">X</span> )
                     </div>
+                    <div class="testOutputText">
+                        Test :
+                        $<span class="testOutput">X</span>
+                        ( <span class="testProfit">X</span>% )
+                    </div>
                 </div>
             </div>
             <div id="pBar2"></div>
             <div id="pBar3"></div>
         </div>
+        <br>
+        <div style="text-align: center; font-size: 14pt;">
+            <input id="testInput" type="text" name="inputUSD" value="1000">
+            <br>
+            Test Quantity (USD)
+        </div>
+        <br>
         <hr>
         <div style="width: 100%; text-align: center; margin-top:2px;">
             <h1>Market Data</h1>

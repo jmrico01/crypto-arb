@@ -159,10 +159,11 @@ function ProcessDepthData(depth)
 
 var site = "";
 var pair = "";
+var testInput = 1000.00;
 
 // Entry format (from analyzer.js):
 // [
-//     fracProfit, flatProfit,
+//     fracProfit, flatFee,
 //     currencyPair
 //     siteBuy, siteBuyPrice,
 //     siteSell, siteSellPrice
@@ -175,10 +176,16 @@ function ProcessProfitData(profits)
         var crypto = profits[i][2].split("-")[0];
         $pEntry.find(".profitCrypto").html(crypto);
         $pEntry.find(".profitPerc").html(profitPerc.toFixed(2));
+        $pEntry.find(".profitFlatFee").html(profits[i][1].toFixed(2));
         $pEntry.find(".profitSite1").html(profits[i][3]);
         $pEntry.find(".profitSite1Price").html(profits[i][4].toFixed(2));
         $pEntry.find(".profitSite2").html(profits[i][5]);
         $pEntry.find(".profitSite2Price").html(profits[i][6].toFixed(2));
+
+        var testOutput = testInput * (1.0 + profits[i][0]) - profits[i][1];
+        var testProfit = (testOutput - testInput) / testInput * 100.0;
+        $pEntry.find(".testOutput").html(testOutput.toFixed(2));
+        $pEntry.find(".testProfit").html(testProfit.toFixed(2));
     }
 }
 
@@ -288,6 +295,18 @@ $(function() {
                 pair = pair.join("-");
                 console.log("Selected currencies: " + pair);
                 FetchData();
+            });
+
+            $("#testInput").change(function(event) {
+                var $target = $(event.target);
+                var newInput = $target.val();
+
+                if (isNaN(newInput)) {
+                    $target.val("");
+                    return;
+                }
+
+                testInput = parseFloat(newInput);
             });
 
             site = initSite;
