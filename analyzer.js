@@ -64,6 +64,13 @@ var fees = {
         },
         taker: [0.26 / 100.0, 0.0],
         maker: [0.16 / 100.0, 0.0]
+    },
+    "QUOINEX": {
+        deposit: {
+            "USD": [0.0, 0.00] // *bank fees?
+        },
+        withdraw: {
+        }
     }
 }
 

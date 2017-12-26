@@ -3,9 +3,9 @@ const path = require("path");
 const express = require("express");
 const app = express();
 
-const cex = require("./cex");
-const okcoin = require("./okcoin");
-const kraken = require("./kraken");
+const cex = require("./site_data/cex");
+const okcoin = require("./site_data/okcoin");
+const kraken = require("./site_data/kraken");
 
 const analyzer = require("./analyzer");
 
