@@ -114,18 +114,6 @@ function CreateConnection()
     for (var pair in mktData) {
         SubscribeOrderBook(pair);
     }
-    /*ws.on("message", OnIncoming);
-    ws.on("open", function() {
-        //Print("Client: connected");
-    });
-    ws.on("close", function(code, reason) {
-        Print("connection closed, code " + code);
-        Print(reason);
-
-        // Restart connection globally here.
-        Print("restarting conection");
-        connection = CreateConnection();
-    });*/
 }
 
 function CompareFloatStrings(s1, s2)
