@@ -1,4 +1,4 @@
-const N_PROFITS = 6;
+const N_PROFITS = 9;
 const PROFIT_THRESHOLD = 0.0;
 
 function ClearPlot()
