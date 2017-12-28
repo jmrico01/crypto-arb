@@ -11,7 +11,7 @@ const okcoin = require("./site_data/okcoin");
 const analyzer = require("./analyzer");
 
 const sites = {
-    "BitStamp": {
+    "Bitstamp": {
         enabled: true,
         module: bitstamp,
         entryParser: function(entry) {

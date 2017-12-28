@@ -15,7 +15,7 @@ var reliable = {}; // are all fees present?
 
 // Format: [fractionalFee, flatFee]
 var fees = {
-    "BitStamp": {
+    "Bitstamp": {
         deposit: {
             "USD": [0.0, 7.50],
 
