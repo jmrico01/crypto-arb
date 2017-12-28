@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 const UPDATE_TIME = 1; // seconds
 
 var sites = {};
@@ -13,19 +15,29 @@ var reliable = {}; // are all fees present?
 
 // Format: [fractionalFee, flatFee]
 var fees = {
-    "OKCoin": {
+    "BitStamp": {
         deposit: {
-            // NO FIAT DEPOSITS :(
+            "USD": [0.0, 7.50],
+
+            "BTC": [0.0, 0.0],
+            "XRP": [0.0, 0.0],
+            "LTC": [0.0, 0.0],
+            "ETH": [0.0, 0.0],
+            "BCH": [0.0, 0.0],
         },
         withdraw: {
-            "BTC": [0.0, 0.02],
-            "LTC": [0.0, 0.005],
-            "ETH": [0.0, 0.01],
-            "ETC": [0.0, 0.01],
-            "BTH": [0.0, 0.002]
+            // This depends on stuff
+            // Check https://www.bitstamp.net/fee_schedule/
+            "USD": [0.0, 10.00],
+
+            "BTC": [0.0, 0.0],
+            "XRP": [0.0, 0.0],
+            "LTC": [0.0, 0.0],
+            "ETH": [0.0, 0.0],
+            "BCH": [0.0, 0.0],
         },
-        taker: [0.20 / 100.0, 0.0],
-        maker: [0.20 / 100.0, 0.0]
+        taker: [0.25 / 100.0, 0.0],
+        maker: [0.25 / 100.0, 0.0]
     },
     "CEX": {
         deposit: {
@@ -33,6 +45,16 @@ var fees = {
         },
         withdraw: {
             "USD": [0.0, 3.8],
+
+            "BTC": [0.0, 0.001],
+            "BCH": [0.0, 0.001],
+            "BTG": [0.0, 0.001],
+            "ETH": [0.0, 0.01],
+            "LTC": [0.0, 0.001],
+            "NMC": [0.0, 0.001],
+            "XDG": [0.0, 1.0],
+            "DASH": [0.0, 0.01],
+            "ZEC": [0.0, 0.001]
         },
         taker: [0.25 / 100.0, 0.0],
         maker: [0.16 / 100.0, 0.0]
@@ -65,6 +87,20 @@ var fees = {
         taker: [0.26 / 100.0, 0.0],
         maker: [0.16 / 100.0, 0.0]
     },
+    "OKCoin": {
+        deposit: {
+            // NO FIAT DEPOSITS :(
+        },
+        withdraw: {
+            "BTC": [0.0, 0.02],
+            "LTC": [0.0, 0.005],
+            "ETH": [0.0, 0.01],
+            "ETC": [0.0, 0.01],
+            "BTH": [0.0, 0.002]
+        },
+        taker: [0.20 / 100.0, 0.0],
+        maker: [0.20 / 100.0, 0.0]
+    },
     "QUOINEX": {
         deposit: {
             "USD": [0.0, 0.00] // *bank fees?
@@ -72,6 +108,16 @@ var fees = {
         withdraw: {
         }
     }
+}
+
+function WriteProfitLog(filePath)
+{
+    fs.writeFile(filePath, "hello", function(err) {
+        if (err) {
+            console.log(err);
+            return;
+        }
+    })
 }
 
 // Return a list, sorted by fracProfit. An entry looks like this:
@@ -320,3 +366,4 @@ function Start(sitesIn, pairsIn)
 
 exports.Start = Start;
 exports.PastThreshold = ProfitsPastThreshold;
+exports.WriteProfitLog = WriteProfitLog;

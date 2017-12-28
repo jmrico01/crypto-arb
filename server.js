@@ -3,16 +3,17 @@ const path = require("path");
 const express = require("express");
 const app = express();
 
+const bitstamp = require("./site_data/bitstamp");
 const cex = require("./site_data/cex");
-const okcoin = require("./site_data/okcoin");
 const kraken = require("./site_data/kraken");
+const okcoin = require("./site_data/okcoin");
 
 const analyzer = require("./analyzer");
 
 const sites = {
-    "OKCoin": {
+    "BitStamp": {
         enabled: true,
-        module: okcoin,
+        module: bitstamp,
         entryParser: function(entry) {
             return entry;
         }
@@ -21,7 +22,7 @@ const sites = {
         enabled: true,
         module: cex,
         entryParser: function(entry) {
-            const DECIMALS = 2;
+            const DECIMALS = 4;
             return [
                 entry[0].toFixed(DECIMALS),
                 [ entry[1][0].toFixed(DECIMALS), entry[1][1] ]
@@ -34,7 +35,14 @@ const sites = {
         entryParser: function(entry) {
             return entry;
         }
-    }
+    },
+    "OKCoin": {
+        enabled: true,
+        module: okcoin,
+        entryParser: function(entry) {
+            return entry;
+        }
+    },
 };
 
 const enabledCryptos = [
