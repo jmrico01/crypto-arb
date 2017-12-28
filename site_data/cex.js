@@ -235,6 +235,10 @@ function CreateConnection()
     
     function HandleOrderBookUnsubscribe(msg)
     {
+        // TODO handle this reset more gracefully.
+        // Don't clear the data out & rewrite, but instead
+        // wait to receive it and then edit our version to match
+        // the server's.
         if (msg.hasOwnProperty("ok")) {
             if (msg.ok !== "ok") {
                 Print("order book unsubscribe not OK");
