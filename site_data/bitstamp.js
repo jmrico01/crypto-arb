@@ -31,20 +31,33 @@ function CreateConnection()
     var pusher = null;
     var channels = {};
 
+    // Reset connection and reload data every so often.
+    var RESET_CONN_TIME = 40; // secs
+
     function ClearData(pair)
     {
         if (pair === undefined || pair === null) {
             for (var p in mktData) {
                 mktData[p].asks.clear();
                 mktData[p].bids.clear();
-                receivedIDs[p] = [];
             }
         }
         else {
             mktData[pair].asks.clear();
             mktData[pair].bids.clear();
-            receivedIDs[pair] = [];
         }
+    }
+
+    function Close()
+    {
+        Print("call to Close()");
+
+        if (pusher !== null) {
+            pusher.disconnect();
+            pusher = null;
+        }
+
+        ClearData();
     }
 
     function AddMarketData(pair, data)
@@ -100,12 +113,15 @@ function CreateConnection()
     pusher = new Pusher(pusherKey, {
         cluster: "mt1"
     });
+    pusher.connection.bind("connected", function() {
+        Print("connected");
+    });
     pusher.connection.bind("error", function(err) {
         Print("connection error: " + err);
         Print("restarting");
         connection = CreateConnection();
     });
-    pusher.connection.bind("disconnect", function() {
+    pusher.connection.bind("disconnected", function() {
         Print("disconnected");
         Print("restarting");
         connection = CreateConnection();
@@ -114,6 +130,10 @@ function CreateConnection()
     for (var pair in mktData) {
         SubscribeOrderBook(pair);
     }
+
+    setTimeout(function() {
+        Close();
+    }, RESET_CONN_TIME * 1000);
 }
 
 function CompareFloatStrings(s1, s2)
