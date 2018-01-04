@@ -399,7 +399,8 @@ function CreateConnection()
         Print("connection closed, code " + code);
         Print(reason);
         if (serverDown) {
-            Print("server is down, restart crypto-arb app")
+            Print("server is down, restart crypto-arb app");
+            mktData = {};
             return;
         }
 
