@@ -19,7 +19,7 @@ const sites = {
         }
     },
     "CEX": {
-        enabled: false,
+        enabled: true,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
@@ -37,7 +37,7 @@ const sites = {
         }
     },
     "OKCoin": {
-        enabled: false,
+        enabled: true,
         module: okcoin,
         entryParser: function(entry) {
             return entry;
