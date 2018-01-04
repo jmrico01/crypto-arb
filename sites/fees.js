@@ -1,7 +1,7 @@
 // Format: [fractionalFee, flatFee]
 //
 // TODO factor in wire transfer fees
-exports.fees = {
+const fees = {
     "Bitstamp": {
         deposit: {
             "USD": [0.0, 7.50],
@@ -89,7 +89,7 @@ exports.fees = {
         taker: [0.20 / 100.0, 0.0],
         maker: [0.20 / 100.0, 0.0]
     },
-    
+
     // In process...
     "QUOINEX": {
         // https://quoine.zendesk.com/hc/en-us/articles/115011281488-Fees
@@ -101,3 +101,57 @@ exports.fees = {
         }
     }
 }
+
+function Deposit(site, curr)
+{
+    if (!fees.hasOwnProperty(site)) {
+        return null;
+    }
+    if (!fees[site].hasOwnProperty("deposit")) {
+        return null;
+    }
+    if (!fees[site].deposit.hasOwnProperty(curr)) {
+        if (fees[site].deposit.hasOwnProperty("default")) {
+            return fees[site].deposit.default;
+        }
+
+        return null;
+    }
+
+    return fees[site].withdraw[curr];
+}
+function Withdraw(site, curr)
+{
+    if (!fees.hasOwnProperty(site)) {
+        return null;
+    }
+    if (!fees[site].hasOwnProperty("withdraw")) {
+        return null;
+    }
+    if (!fees[site].withdraw.hasOwnProperty(curr)) {
+        if (fees[site].withdraw.hasOwnProperty("default")) {
+            return fees[site].withdraw.default;
+        }
+
+        return null;
+    }
+
+    return fees[site].withdraw[curr];
+}
+function Exchange(site, curr1, curr2)
+{
+    if (!fees.hasOwnProperty(site)) {
+        return null;
+    }
+    if (!fees[site].hasOwnProperty("taker")) {
+        return null;
+    }
+    // Forward support for currency-dependent taker fees here.
+
+    return fees[site].taker;
+}
+
+exports.fees = fees;
+exports.Deposit = Deposit;
+exports.Withdraw = Withdraw;
+exports.Exchange = Exchange;

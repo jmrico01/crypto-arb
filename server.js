@@ -9,6 +9,7 @@ const kraken = require("./sites/kraken");
 const okcoin = require("./sites/okcoin");
 
 const analyzer = require("./analyzer");
+const profits = require("./profits");
 
 const sites = {
     "Bitstamp": {
@@ -70,15 +71,40 @@ for (var i = 0; i < enabledFiats.length; i++) {
 }
 
 // Start site modules, which pull in data from each API
-for (var site in sites) {
-    if (!sites[site].enabled) continue;
+var siteNames = Object.keys(sites);
+function StartSiteRecursive(idx, callback)
+{
+    var site = siteNames[idx];
+    if (!sites[site].enabled) {
+        if (idx + 1 < siteNames.length) {
+            StartSiteRecursive(idx + 1, callback);
+        }
+        else {
+            callback();
+        }
+        return;
+    }
 
     console.log("starting " + site);
-    sites[site].module.Start(pairs);
+    sites[site].module.Start(pairs, function() {
+        if (idx + 1 < siteNames.length) {
+            StartSiteRecursive(idx + 1, callback);
+        }
+        else {
+            callback();
+        }
+    });
 }
 
-// Start the analyzer
-analyzer.Start(sites, pairs);
+StartSiteRecursive(0, function() {
+    console.log("All sites started");
+
+    // Start the analyzer
+    analyzer.Start(sites, pairs);
+    
+    // Start analyzer v2
+    //profits.Start(sites);
+});
 
 //mongoose.connect("")
 

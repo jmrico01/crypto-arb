@@ -383,14 +383,25 @@ function CreateConnection()
         }
     }
 
+    var serverDown = false;
     ws = new WebSocket(host);
     ws.on("message", OnIncoming);
     ws.on("open", function() {
         //Print("Client: connected");
     });
+    ws.on("error", function(err) {
+        Print(err);
+        if (err.toString().indexOf("521") !== -1) {
+            serverDown = true;
+        }
+    });
     ws.on("close", function(code, reason) {
         Print("connection closed, code " + code);
         Print(reason);
+        if (serverDown) {
+            Print("server is down, restart crypto-arb app")
+            return;
+        }
 
         // Restart connection globally here.
         Print("restarting conection");
@@ -405,7 +416,7 @@ function CompareFloats(f1, f2)
     else                return 0;
 }
 
-function Start(pairs)
+function Start(pairs, callback)
 {
     var supportedCryptos = [
         "BTC",
@@ -440,6 +451,7 @@ function Start(pairs)
     }
 
     connection = CreateConnection();
+    callback();
 }
 
 exports.Start = Start;

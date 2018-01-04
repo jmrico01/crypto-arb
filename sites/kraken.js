@@ -355,7 +355,7 @@ function Stop()
     clearInterval(pollTickerInterval);
 }
 
-function Start(pairs)
+function Start(pairs, callback)
 {
     SubmitPublicRequest("AssetPairs", {}, function(data) {
         if (data.error.length !== 0) {
@@ -381,6 +381,7 @@ function Start(pairs)
         }
         
         StartDataPoll();
+        callback();
     });
 }
 
