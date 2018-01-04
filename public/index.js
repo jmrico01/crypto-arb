@@ -158,8 +158,9 @@ function ProcessDepthData(depth)
     Plot([asks, bids], depthPriceMin, depthPriceMax);
 }
 
-var site = "";
-var pair = "";
+var fetchDataInterval = null;
+var site = null;
+var pair = null;
 var testInput = 1000.00;
 
 // Entry format (from analyzer.js):
@@ -171,7 +172,8 @@ var testInput = 1000.00;
 // ]
 function ProcessProfitData(profits)
 {
-    for (var i = 0; i < N_PROFITS; i++) {
+    var numProfits = Math.min(profits.length, N_PROFITS);
+    for (var i = 0; i < numProfits; i++) {
         var $pEntry = $("#profit" + i);
         var profitPerc = profits[i][0] * 100.0;
         var crypto = profits[i][2].split("-")[0];
@@ -187,6 +189,12 @@ function ProcessProfitData(profits)
         var testProfit = (testOutput - testInput) / testInput * 100.0;
         $pEntry.find(".testOutput").html(testOutput.toFixed(2));
         $pEntry.find(".testProfit").html(testProfit.toFixed(2));
+    }
+    for (var i = numProfits; i < N_PROFITS; i++) {
+        var $pEntry = $("#profit" + i);
+        $pEntry.find(".profitCrypto").html("???");
+        $pEntry.find(".profitPerc").html("X");
+        $pEntry.find(".profitFlatFee").html("X");
     }
 }
 
@@ -217,7 +225,6 @@ function FetchData()
         dataType: "json",
         url: "profits?threshold=" + PROFIT_THRESHOLD.toString(),
         success: function(pastThreshold) {
-            console.log(pastThreshold);
             ProcessProfitData(pastThreshold);
         },
         error: function(req, status, err) {
@@ -226,77 +233,61 @@ function FetchData()
     })
 }
 
-$(function() {
-    // Generate buttons for sites, cryptos, fiats
+function SetEnabledCurrencyPairs(pairs)
+{
+    if (pairs.length === 0) {
+        return;
+    }
+
+    var initPair = pair;
+    if (initPair === null) {
+        initPair = "BTC-USD";
+    }
+    if (pairs.indexOf(initPair) === -1) {
+        initPair = pairs[0];
+    }
+
+    var $pairButtons = $("#pairButtons");
+    $pairButtons.html("");
+    for (var i = 0; i < pairs.length; i++) {
+        var $new = $("<button class=\"pair\">"
+            + pairs[i] + "</button>");
+        $pairButtons.append($new);
+
+        if (pairs[i] === initPair) {
+            $new.addClass("buttonSelected");
+        }
+    }
+    pair = initPair;
+
+    $(".pair").click(function(event) {
+        $(".pair").removeClass("buttonSelected");
+        var $target = $(event.target);
+        $target.addClass("buttonSelected");
+        pair = $target.html();
+        console.log("Selected currency pair: " + pair);
+        FetchData();
+    });
+}
+
+function ResetCurrencyPairs(newSite)
+{
     $.ajax({
         dataType: "json",
-        url: "enabled",
-        success: function(enabledInfo) {
-            var initSite = "CEX";
-            var initCrypto = "BTC";
-            var initFiat = "USD";
-            if (enabledInfo.sites.indexOf(initSite) === -1) {
-                initSite = enabledInfo.sites[0];
-            }
+        url: "enabledPairs?site=" + newSite,
+        success: function(enabledPairs) {
+            SetEnabledCurrencyPairs(enabledPairs);
 
-            var $bar2 = $("#bar2");
-            for (var i = 0; i < enabledInfo.sites.length; i++) {
-                var $new = $("<button class=\"site\">" 
-                    + enabledInfo.sites[i] + "</button>");
-                $bar2.append($new);
-
-                if (enabledInfo.sites[i] === initSite) {
-                    $new.addClass("buttonSelected");
-                }
-            }
-            $bar2.append("<br><br>");
-            for (var i = 0; i < enabledInfo.cryptos.length; i++) {
-                var $new = $("<button class=\"crypto\">"
-                    + enabledInfo.cryptos[i] + "</button>");
-                $bar2.append($new);
-
-                if (enabledInfo.cryptos[i] === initCrypto) {
-                    $new.addClass("buttonSelected");
-                }
-            }
-            $bar2.append("<br><br>");
-            for (var i = 0; i < enabledInfo.fiats.length; i++) {
-                var $new = $("<button class=\"fiat\">"
-                    + enabledInfo.fiats[i] + "</button>");
-                $bar2.append($new);
-
-                if (enabledInfo.fiats[i] === initFiat) {
-                    $new.addClass("buttonSelected");
-                }
-            }
-            
             $(".site").click(function(event) {
                 $(".site").removeClass("buttonSelected");
                 var $target = $(event.target);
                 $target.addClass("buttonSelected");
                 site = $target.html();
                 console.log("Selected site " + site);
-                FetchData();
-            });
-            $(".crypto").click(function(event) {
-                $(".crypto").removeClass("buttonSelected");
-                var $target = $(event.target);
-                $target.addClass("buttonSelected");
-                pair = pair.split("-");
-                pair[0] = $target.html();
-                pair = pair.join("-");
-                console.log("Selected currencies: " + pair);
-                FetchData();
-            });
-            $(".fiat").click(function(event) {
-                $(".fiat").removeClass("buttonSelected");
-                var $target = $(event.target);
-                $target.addClass("buttonSelected");
-                pair = pair.split("-");
-                pair[1] = $target.html();
-                pair = pair.join("-");
-                console.log("Selected currencies: " + pair);
-                FetchData();
+                clearInterval(fetchDataInterval);
+                $(".site").unbind("click");
+
+                ResetCurrencyPairs(site);
             });
 
             $("#testInput").change(function(event) {
@@ -309,18 +300,49 @@ $(function() {
                 }
 
                 testInput = parseFloat(newInput);
+                console.log("test input changed: " + testInput);
+                FetchData();
             });
 
-            site = initSite;
-            pair = initCrypto + "-" + initFiat;
+            site = newSite;
             FetchData();
 
-            setInterval(function() {
+            fetchDataInterval = setInterval(function() {
                 FetchData();
             }, 1000);
         },
         error: function(req, status, err) {
-            console.log("Failed to get data/enabled info");
+            console.log("Failed to get enabled pairs for " + site);
+        }
+    });
+}
+
+$(function() {
+    // Generate buttons for sites, cryptos, fiats
+    $.ajax({
+        dataType: "json",
+        url: "enabledSites",
+        success: function(enabledSites) {
+            var initSite = "CEX";
+            if (enabledSites.indexOf(initSite) === -1) {
+                initSite = enabledSites[0];
+            }
+
+            var $siteButtons = $("#siteButtons");
+            for (var i = 0; i < enabledSites.length; i++) {
+                var $new = $("<button class=\"site\">" 
+                    + enabledSites[i] + "</button>");
+                $siteButtons.append($new);
+
+                if (enabledSites[i] === initSite) {
+                    $new.addClass("buttonSelected");
+                }
+            }
+
+            ResetCurrencyPairs(initSite);
+        },
+        error: function(req, status, err) {
+            console.log("Failed to get enabled sites");
         }
     });
 

@@ -40,6 +40,10 @@ button:hover {
     color: #ddd;
 }
 
+#siteButtons {
+    margin-bottom: 20px;
+}
+
 #profits {
     width: 100%;
     /*height: 150pt;*/

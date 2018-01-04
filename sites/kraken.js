@@ -336,6 +336,8 @@ function StartDataPoll()
             ProcessDepthData(data.result);
         });
     }, POLL_DEPTH_TIME * 1000.0 / numPairs);
+
+    Print("started");
 }
 
 function CompareFloatStrings(s1, s2)

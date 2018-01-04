@@ -3,10 +3,10 @@ const path = require("path");
 const express = require("express");
 const app = express();
 
-const bitstamp = require("./site_data/bitstamp");
-const cex = require("./site_data/cex");
-const kraken = require("./site_data/kraken");
-const okcoin = require("./site_data/okcoin");
+const bitstamp = require("./sites/bitstamp");
+const cex = require("./sites/cex");
+const kraken = require("./sites/kraken");
+const okcoin = require("./sites/okcoin");
 
 const analyzer = require("./analyzer");
 
@@ -19,7 +19,7 @@ const sites = {
         }
     },
     "CEX": {
-        enabled: true,
+        enabled: false,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
@@ -37,7 +37,7 @@ const sites = {
         }
     },
     "OKCoin": {
-        enabled: true,
+        enabled: false,
         module: okcoin,
         entryParser: function(entry) {
             return entry;
@@ -80,23 +80,41 @@ for (var site in sites) {
 // Start the analyzer
 analyzer.Start(sites, pairs);
 
+//mongoose.connect("")
+
 app.set("port", 8080);
 app.use(express.static(path.join(__dirname, "public")));
 app.listen(app.get("port"));
 
-// Serve enabled sites & currencies
-app.get("/enabled", function(req, res) {
+// Serve enabled sites
+app.get("/enabledSites", function(req, res) {
     var enabledSites = [];
     for (var site in sites) {
         if (sites[site].enabled) {
             enabledSites.push(site);
         }
     }
-    res.send({
-        sites: enabledSites,
-        cryptos: enabledCryptos,
-        fiats: enabledFiats
-    });
+    res.send(enabledSites);
+});
+
+// Serve enabled pairs for the given site
+app.get("/enabledPairs", function(req, res) {
+    var site = req.query.site;
+
+    if (!sites.hasOwnProperty(site)) {
+        res.sendStatus(404);
+        return;
+    }
+    if (!sites[site].enabled) {
+        res.sendStatus(404);
+        return;
+    }
+
+    var enabledPairs = [];
+    for (var pair in sites[site].module.data) {
+        enabledPairs.push(pair);
+    }
+    res.send(enabledPairs);
 });
 
 // Serve market depth data
