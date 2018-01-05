@@ -145,7 +145,7 @@ function CompareFloatStrings(s1, s2)
     else            return 0;
 }
 
-function Start(pairs, callback)
+function Start(pairs)
 {
     var supportedCryptos = [
         "BTC",
@@ -176,7 +176,6 @@ function Start(pairs, callback)
     }
 
     connection = CreateConnection();
-    callback();
 }
 
 exports.Start = Start;

@@ -2,7 +2,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const WebSocket = require("ws");
 
-const ordHash = require("./ordered-hash");
+const ordHash = require("./../ordered-hash");
 
 const key = "cHZ8E9ieHTwLcdCeXjMy7JZ20wo";
 const secret = fs.readFileSync("keys/cex", "utf8").trim();

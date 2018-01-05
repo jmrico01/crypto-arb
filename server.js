@@ -103,7 +103,7 @@ StartSiteRecursive(0, function() {
     analyzer.Start(sites, pairs);
     
     // Start analyzer v2
-    //profits.Start(sites);
+    profits.Start(sites);
 });
 
 //mongoose.connect("")
@@ -181,4 +181,9 @@ app.get("/depth", function(req, res) {
 app.get("/profits", function (req, res) {
     var threshold = parseFloat(req.query.threshold);
     res.send(analyzer.PastThreshold(threshold));
+});
+
+app.get("/profitPaths", function(req, res) {
+    var numPaths = parseInt(req.query.numPaths);
+    res.send(profits.GetMaxProfitPaths(numPaths));
 });

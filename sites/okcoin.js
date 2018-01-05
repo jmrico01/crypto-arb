@@ -1,6 +1,6 @@
 const WebSocket = require("ws");
 
-const ordHash = require("./ordered-hash");
+const ordHash = require("./../ordered-hash");
 
 const key = "17de37be-57ff-4575-b12d-d4e1428dbf5a";
 const host = "wss://real.okcoin.com:10440/websocket/okcoinapi";

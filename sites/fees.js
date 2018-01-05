@@ -118,8 +118,9 @@ function Deposit(site, curr)
         return null;
     }
 
-    return fees[site].withdraw[curr];
+    return fees[site].deposit[curr];
 }
+
 function Withdraw(site, curr)
 {
     if (!fees.hasOwnProperty(site)) {
@@ -138,6 +139,7 @@ function Withdraw(site, curr)
 
     return fees[site].withdraw[curr];
 }
+
 function Exchange(site, curr1, curr2)
 {
     if (!fees.hasOwnProperty(site)) {

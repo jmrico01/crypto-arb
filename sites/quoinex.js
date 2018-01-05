@@ -2,7 +2,7 @@ const fs = require("fs");
 const https = require("https");
 const crypto = require("crypto");
 
-const ordHash = require("./ordered-hash");
+const ordHash = require("./../ordered-hash");
 
 const key = "vF0cAyn3hjEphiQ7ljxE5nwEEF+zRTynHVMcuFHyhGDBauCgtvk+ogsR";
 const secret = fs.readFileSync("keys/kraken", "utf8").trim();

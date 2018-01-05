@@ -1,31 +1,29 @@
-function BinarySearchOrPrev(array, val, cmpFunc)
-{
-    var minIndex = 0;
-    var maxIndex = array.length - 1;
- 
-    while (minIndex <= maxIndex) {
-        var curIndex = (minIndex + maxIndex) / 2 | 0;
-        var curVal = array[curIndex];
-        var cmp = cmpFunc(curVal, val);
- 
-        if (cmp < 0) {
-            minIndex = curIndex + 1;
-        }
-        else if (cmp > 0) {
-            maxIndex = curIndex - 1;
-        }
-        else {
-            return [curIndex, -1];
-        }
+function MakeFixedQueue(size) {
+    if (!Number.isInteger(size)) {
+        console.assert(false, "Fixed queue non-integer size");
+        return null;
     }
- 
-    return [-1, minIndex];
-}
 
-function MakeOrderedHash(cmpFunc) {
-    var keys = [];
-    var vals = {};
+    array = [];
+    array.length = size;
+    start = 0;
+    end = 0;
+
     return {
+        Enqueue: function(item) {
+            array[end] = item;
+            
+        },
+        Dequeue: function() {
+        },
+        GetLength: function() {
+            if (start < end) {
+                return end - start;
+            }
+            else {
+                return end + array.length - start;
+            }
+        },
         insert: function(k, v) {
             if (!vals[k]) {
                 var pos = BinarySearchOrPrev(keys, k, cmpFunc)[1];
