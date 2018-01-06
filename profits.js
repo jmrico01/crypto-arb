@@ -3,7 +3,6 @@ const UPDATE_TIME = 2.0; // seconds
 const fees = require("./sites/fees");
 const ordHash = require("./ordered-hash")
 const Queue = require("./queue");
-const paths = require("./build/Release/addon");
 
 // See server.js "sites" variable
 var sites = {};
@@ -319,7 +318,6 @@ function UpdateExchangeLinks()
     }
 
     CalcMaxProfitPaths();
-    //console.log(paths.hello());
 }
 
 function Start(sitesIn)
