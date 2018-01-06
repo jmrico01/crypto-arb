@@ -3,6 +3,7 @@ const UPDATE_TIME = 2.0; // seconds
 const fees = require("./sites/fees");
 const ordHash = require("./ordered-hash")
 const Queue = require("./queue");
+const paths = require("./build/Release/addon");
 
 // See server.js "sites" variable
 var sites = {};
@@ -187,7 +188,7 @@ function CalcPathProfit(path)
 
 function CalcMaxProfitPaths()
 {
-    var depthMarker = "!GOING_DEEPER!";
+    var depthMarker = "!DEPTH!";
     var maxDepth = Object.keys(nodes).length - 1;
     //var maxDepth = Math.floor(Object.keys(nodes).length / 2);
     console.log("max depth: " + maxDepth);
@@ -243,7 +244,11 @@ function CalcMaxProfitPaths()
             time2 += Date.now() - t2;
 
             var t4 = Date.now();
-            var newPath = paths[info.pathID].slice();
+            var nodePath = paths[info.pathID];
+            var newPath = new Array(nodePath.length);
+            for (var i = 0; i < nodePath.length; i++) {
+                newPath[i] = nodePath[i];
+            }
             newPath.push(neighbor);
             time4 += Date.now() - t4;
 
@@ -314,6 +319,7 @@ function UpdateExchangeLinks()
     }
 
     CalcMaxProfitPaths();
+    //console.log(paths.hello());
 }
 
 function Start(sitesIn)
@@ -459,7 +465,17 @@ function Start(sitesIn)
         ];
     }
 
-    //console.log(links);
+    var nNodes = Object.keys(nodes).length;
+    var nEdges = 0;
+    for (var n1 in links) {
+        for (var n2 in links) {
+            nEdges++;
+        }
+    }
+    console.log("profits.js graph created");
+    console.log("Nodes: " + nNodes);
+    console.log("Edges: " + nEdges);
+
     setInterval(UpdateExchangeLinks, UPDATE_TIME * 1000);
 }
 

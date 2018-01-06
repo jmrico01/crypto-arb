@@ -103,10 +103,8 @@ StartSiteRecursive(0, function() {
     analyzer.Start(sites, pairs);
     
     // Start analyzer v2
-    profits.Start(sites);
+    //profits.Start(sites);
 });
-
-//mongoose.connect("")
 
 app.set("port", 8080);
 app.use(express.static(path.join(__dirname, "public")));
