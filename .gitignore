@@ -2,3 +2,7 @@ node_modules/
 package-lock.json
 keys/
 .vscode/
+
+profit-graph.data
+profit-paths.json
+profitPaths

@@ -103,7 +103,7 @@ StartSiteRecursive(0, function() {
     analyzer.Start(sites, pairs);
     
     // Start analyzer v2
-    //profits.Start(sites);
+    profits.Start(sites);
 });
 
 app.set("port", 8080);

@@ -1,5 +1,10 @@
-const UPDATE_TIME = 2.0; // seconds
+const UPDATE_TIME = 1.0; // seconds
+const MAX_PATHS = 100;
+const PROFIT_GRAPH_FILE = "profit-graph.data";
+const PROFIT_PATHS_FILE = "profit-paths.json";
 
+const fs = require("fs");
+const childProcess = require("child_process");
 const fees = require("./sites/fees");
 const ordHash = require("./ordered-hash")
 const Queue = require("./queue");
@@ -62,230 +67,46 @@ function GetExchangeRate(site, curr1, curr2)
     }
 }
 
-function CompareLinkProfit(p1, p2)
-{
-    if (p1[0] < p2[0]) return -1;
-    else if (p1[0] > p2[0]) return 1;
-    else return 0;
-
-    if (p1[0] <= 1.0) {
-        if (p2[0] <= 1.0) {
-            if (p1[0] < p2[0]) return -1;
-            else if (p1[0] > p2[0]) return 1;
-            else return 0;
-        }
-
-        return -1;
-    }
-    else if (p2[0] <= 1.0) {
-        return 1;
-    }
-    
-    var breakEven1 = p1[1] / (p1[0] - 1.0);
-    var breakEven2 = p2[1] / (p2[0] - 1.0);
-    if (breakEven1 > breakEven2) return -1;
-    else if (breakEven1 < breakEven2) return 1;
-    else return 0;
-}
-
-function AddLinkProfit(p1, p2)
-{
-    return [
-        p1[0] * p2[0],
-        p1[1] * p2[0] + p2[1],
-        p1[2] + p2[2]
-    ];
-}
-
-function MaxProfitPath(investment)
-{
-    //var profit = {};
-    var output = {};
-    var prev = {};
-
-    for (var node in nodes) {
-        //profit[node] = [0.0, 0.00, 0.0];
-        output[node] = Number.NEGATIVE_INFINITY;
-        prev[node] = null;
-    }
-    //profit["start"] = [1.0, 0.00, 0.0];
-    output["start"] = investment;
-
-    var numNodes = Object.keys(nodes).length;
-    for (var i = 1; i < numNodes; i++) {
-        for (var node1 in links) {
-            for (var node2 in links[node1]) {
-                if (links[node1][node2] === null) {
-                    // Exchange rates haven't been initialized
-                    continue;
-                }
-
-                /*var newProfit = AddLinkProfit(profit[node1],
-                    links[node1][node2]);
-                if (CompareLinkProfit(newProfit, profit[node2]) > 0) {*/
-                var link = links[node1][node2];
-                var newOutput = output[node1] * link[0] - link[1];
-                if (newOutput > output[node2]) {
-                    //profit[node2] = newProfit;
-                    output[node2] = newOutput;
-                    prev[node2] = node1;
-                }
-            }
-        }
-        //console.log(profit);
-        //console.log(output);
-    }
-
-    for (var node1 in links) {
-        for (var node2 in links[node1]) {
-            if (links[node1][node2] === null) {
-                // Exchange rates haven't been initialized
-                continue;
-            }
-
-            /*var newProfit = AddLinkProfit(profit[node1],
-                links[node1][node2]);
-            if (CompareLinkProfit(newProfit, profit[node2]) > 0) {*/
-            var link = links[node1][node2];
-            var newOutput = output[node1] * link[0] - link[1];
-            if (newOutput > output[node2]) {
-                console.log("Increasing profit cycle");
-            }
-        }
-    }
-
-    /*var path = [];
-    current = "end";
-    while (prev[current] !== null) {
-        //console.log(current);
-        path.unshift(current);
-        current = prev[current];
-    }
-    path.unshift("start");*/
-
-    //console.log(path);
-
-    console.log(output);
-}
-
-function CalcPathProfit(path)
-{
-    if (path.length < 2) {
-        return null;
-    }
-    if (path[0] !== "start" || path[path.length - 1] !== "end") {
-        return null;
-    }
-
-    var profit = [1.0, 0.00, 0.0];
-    for (var i = 1; i < path.length; i++) {
-        profit = AddLinkProfit(profit, links[path[i-1]][path[i]]);
-    }
-
-    return profit;
-}
-
-function CalcMaxProfitPaths()
-{
-    var depthMarker = "!DEPTH!";
-    var maxDepth = Object.keys(nodes).length - 1;
-    //var maxDepth = Math.floor(Object.keys(nodes).length / 2);
-    console.log("max depth: " + maxDepth);
-
-    var paths = [ ["start"] ];
-    var freeID = null;
-
-    var toVisit = new Queue();
-    var nodeInfo = new Queue();
-    var depth = 0;
-
-    //debug timing
-    var time1 = 0.0;
-    var time5 = 0.0;
-    var time2 = 0.0;
-    var time4 = 0.0;
-    var time3 = 0.0;
-
-    toVisit.Enqueue("start");
-    nodeInfo.Enqueue({ pathID: 0 });
-    toVisit.Enqueue(depthMarker);
-    while (depth < maxDepth) {
-        var t1 = Date.now();
-        var node = toVisit.Dequeue();
-        if (node === depthMarker) {
-            depth++;
-            toVisit.Enqueue(depthMarker);
-            if (depth % 5 === 0) {
-                console.log("===== depth: " + depth + " =====");
-            }
-            continue;
-        }
-        var info = nodeInfo.Dequeue();
-        time1 += Date.now() - t1;
-
-        var t5 = Date.now();
-        if (node === "end") {
-            var profit = CalcPathProfit(paths[info.pathID]);
-            profitPaths.insert(profit, paths[info.pathID]);
-            continue;
-        }
-        time5 += Date.now() - t5;
-
-        for (var neighbor in links[node]) {
-            var t2 = Date.now();
-            if (neighbor === null || links[node][neighbor] === null) {
-                continue;
-            }
-            if (paths[info.pathID].indexOf(neighbor) !== -1) {
-                // Node already in path, will create a cycle.
-                continue;
-            }
-            time2 += Date.now() - t2;
-
-            var t4 = Date.now();
-            var nodePath = paths[info.pathID];
-            var newPath = new Array(nodePath.length);
-            for (var i = 0; i < nodePath.length; i++) {
-                newPath[i] = nodePath[i];
-            }
-            newPath.push(neighbor);
-            time4 += Date.now() - t4;
-
-            var t3 = Date.now();
-            var pathID = freeID;
-            if (pathID === null) {
-                pathID = paths.length;
-                paths.push(newPath);
-            }
-            else {
-                paths[pathID] = newPath;
-                freeID = null;
-            }
-
-            toVisit.Enqueue(neighbor);
-            nodeInfo.Enqueue({ pathID: pathID });
-            time3 += Date.now() - t3;
-        }
-        paths[info.pathID] = null;
-        freeID = info.pathID;
-    }
-
-    console.log("Timing: ");
-    console.log(time1 / 1000.0);
-    console.log(time5 / 1000.0);
-    console.log(time2 / 1000.0);
-    console.log(time4 / 1000.0);
-    console.log(time3 / 1000.0);
-}
-
 function GetMaxProfitPaths(numPaths)
 {
-    var paths = [];
-    var k = Math.min(numPaths, profitPaths.length());
-    for (var i = 0; i < k; i++) {
-        paths.push(profitPaths.entryByIndex(i));
+    var k = Math.min(numPaths, MAX_PATHS);
+    var profitPaths = JSON.parse(fs.readFileSync(PROFIT_PATHS_FILE));
+    return profitPaths;
+}
+
+function WriteProfitGraph(filePath, callback)
+{
+    var dataStr = "";
+
+    // Write nodes
+    var nodeArray = Object.keys(nodes);
+    dataStr += nodeArray.length.toString() + "\n";
+    for (var i = 0; i < nodeArray.length; i++) {
+        dataStr += nodeArray[i] + ","
     }
-    return paths;
+    dataStr = dataStr.substring(0, dataStr.length - 1) + "\n";
+
+    // Write links
+    for (var i = 0; i < nodeArray.length; i++) {
+        for (var j = 0; j < nodeArray.length; j++) {
+            if (links.hasOwnProperty(nodeArray[i])) {
+                if (links[nodeArray[i]].hasOwnProperty(nodeArray[j])) {
+                    if (links[nodeArray[i]][nodeArray[j]] !== null) {
+                        dataStr += 
+                            "["
+                            + links[nodeArray[i]][nodeArray[j]].toString()
+                            + "]";
+                    }
+                }
+            }
+            dataStr += ",";
+        }
+        dataStr = dataStr.substring(0, dataStr.length - 1) + "\n";
+    }
+    dataStr = dataStr.substring(0, dataStr.length - 1);
+
+    //console.log(dataStr);
+    fs.writeFile(filePath, dataStr, callback);
 }
 
 function UpdateExchangeLinks()
@@ -317,7 +138,30 @@ function UpdateExchangeLinks()
         }
     }
 
-    CalcMaxProfitPaths();
+    WriteProfitGraph(PROFIT_GRAPH_FILE, function(err) {
+        if (err) {
+            console.log("Error writing profit graph");
+            console.log(err);
+            return;
+        }
+
+        const profitPathsProc = childProcess.execFile(
+            "./profitPaths", [
+                PROFIT_GRAPH_FILE,
+                PROFIT_PATHS_FILE,
+                MAX_PATHS.toString(),
+            ],
+            function(error, stdout, stderr) {
+                if (error) {
+                    //console.log("Error in profit paths calculation");
+                    //console.log(error);
+                    return;
+                }
+                if (stdout !== "") {
+                    console.log(stdout);
+                }
+            });
+    });
 }
 
 function Start(sitesIn)
