@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <queue>
+#include <set>
 #include <algorithm>
 
 #define NODE_NAME_MAX_LEN 32
@@ -141,6 +142,113 @@ void CalcMaxProfitPaths(
     //printf("paths: %d\nfinal: %d\n", paths.size(), profitPaths.size());
 }
 
+void FindUniqueCyclesTiernan(
+    int numNodes, Link** links,
+    std::vector<std::vector<int>>& cycles)
+{
+    int* path = (int*)malloc(numNodes * sizeof(int));
+    int k = 0;
+    path[k] = 0;
+    std::set<int>* closed = new std::set<int>[numNodes];
+
+    while (true) {
+        // Path extension
+        while (true) {
+            /*printf("path extension step\npath: ");
+            for (int i = 0; i <= k; i++) {
+                printf("%d, ", path[i]);
+            }
+            printf("\n");*/
+
+            bool foundNext = false;
+            for (int i = 0; i < numNodes; i++) {
+                if (links[path[k]][i].frac == 0.0) {
+                    continue;
+                }
+
+                if (i <= path[0]) {
+                    continue;
+                }
+                bool inPath = false;
+                for (int j = 0; j <= k; j++) {
+                    if (path[j] == i) {
+                        inPath = true;
+                        break;
+                    }
+                }
+                if (inPath) {
+                    continue;
+                }
+                if (closed[path[k]].find(i) != closed[path[k]].end()) {
+                    continue;
+                }
+
+                foundNext = true;
+                path[++k] = i;
+                break;
+            }
+            if (!foundNext) {
+                //printf("=> NO NEXT NODE\n");
+                break;
+            }
+        }
+
+        // Circuit confirmation
+        if (links[path[k]][path[0]].frac != 0.0) {
+            //printf("-- Unique cycle found --\n");
+            std::vector<int> cycle(k + 1);
+            for (int i = 0; i <= k; i++) {
+                cycle[i] = path[i];
+            }
+            cycles.push_back(cycle);
+        }
+
+        // Vertex closure
+        if (k != 0) {
+            //printf("<= backtracking path\n");
+            closed[path[k]].clear();
+            closed[path[k-1]].insert(path[k]);
+            path[k--] = 0;
+        }
+        else {
+            // Advance initial vertex
+            if (path[0] == numNodes - 1) {
+                // Done
+                //printf("Done\n");
+                break;
+            }
+
+            //printf("Advancing initial vertex\n");
+            path[0]++;
+            k = 0;
+            for (int i = 0; i < numNodes; i++) {
+                closed[i].clear();
+            }
+        }
+    }
+
+    delete[] closed;
+    free(path);
+}
+
+void FindProfitCycles(
+    int numNodes, Link** links,
+    std::vector<Path>& profitCycles)
+{
+    std::vector<std::vector<int>> cycles;
+    FindUniqueCyclesTiernan(numNodes, links, cycles);
+
+    for (int i = 0; i < (int)cycles.size(); i++) {
+        cycles[i].push_back(cycles[i][0]);
+        Link profit = CalcPathProfit(cycles[i], links);
+        if (profit.frac > 1.0) {
+            profitCycles.push_back({ profit, cycles[i] });
+        }
+    }
+
+    std::sort(profitCycles.begin(), profitCycles.end(), ComparePaths);
+}
+
 bool ParseLink(char* buf, Link* link)
 {
     char* fields[LINK_FIELDS];
@@ -149,7 +257,7 @@ bool ParseLink(char* buf, Link* link)
     for (int i = 0; i < LINK_BUF_LEN; i++) {
         if (buf[i] == ',') {
             if (field >= LINK_FIELDS) {
-                fprintf(stderr, "Too many link fields");
+                fprintf(stderr, "Too many link fields\n");
                 return false;
             }
 
@@ -158,7 +266,7 @@ bool ParseLink(char* buf, Link* link)
         }
     }
     if (field != LINK_FIELDS) {
-        fprintf(stderr, "Not enough link fields");
+        fprintf(stderr, "Not enough link fields\n");
         return false;
     }
 
@@ -166,7 +274,7 @@ bool ParseLink(char* buf, Link* link)
         char* e;
         float field = (float)strtod(fields[i], &e);
         if (*e != '\0') {
-            fprintf(stderr, "Field strtod parse failed");
+            fprintf(stderr, "Field strtod parse failed\n");
             return false;
         }
 
@@ -204,17 +312,48 @@ void Cleanup(FILE* file, int numNodes, char** nodes, Link** links)
     }
 }
 
+void WritePaths(
+    FILE* outFile, char** nodes,
+    const std::vector<Path>& paths, int k)
+{
+    fprintf(outFile, "[\n");
+    for (int i = 0; i < k; i++) {
+        fprintf(outFile, "    [ [%f, %f, %f], [",
+            paths[i].profit.frac,
+            paths[i].profit.flat,
+            paths[i].profit.time);
+        for (int j = 0; j < (int)paths[i].path.size(); j++) {
+            fprintf(outFile, "\"%s\"", nodes[paths[i].path[j]]);
+            if (j != (int)paths[i].path.size() - 1) {
+                fprintf(outFile, ", ");
+            }
+        }
+        fprintf(outFile, "] ]");
+        if (i != k - 1) {
+            fprintf(outFile, ",");
+        }
+        fprintf(outFile, "\n");
+    }
+    fprintf(outFile, "]");
+}
+
 int main(int argc, char* argv[])
 {
-    if (argc != 4) {
-        fprintf(stderr, "Expected 3 arguments: inFile, outFile, numPaths");
+    if (argc != 6) {
+        fprintf(stderr, "Expected 5 arguments: %s",
+            "inFile, pathsFile, cyclesFile, numPaths, numCycles");
         return 1;
     }
     char* e;
-    int numPaths = (int)strtol(argv[3], &e, 10);
+    int numPaths = (int)strtol(argv[4], &e, 10);
     if (*e != '\0') {
         fprintf(stderr, "Invalid numPaths argument");
-        return false;
+        return 1;
+    }
+    int numCycles = (int)strtol(argv[5], &e, 10);
+    if (*e != '\0') {
+        fprintf(stderr, "Invalid numCycles argument");
+        return 1;
     }
 
     FILE* file = fopen(argv[1], "r");
@@ -226,7 +365,9 @@ int main(int argc, char* argv[])
     if (c == '\n') {
         fprintf(stderr, "Unexpected double new line");
         Cleanup(file, 0, 0, 0);
-        return 1;
+        // Errors like these (parsing) shouldn't crash the thing,
+        // so we return 0 instead of 1
+        return 0;
     }
     int numNodes = 0;
 
@@ -235,7 +376,7 @@ int main(int argc, char* argv[])
         if (c < 0x30 || c > 0x39) {
             fprintf(stderr, "Expected number of nodes in first line");
             Cleanup(file, 0, 0, 0);
-            return 1;
+            return 0;
         }
         numNodes = numNodes * 10 + c - 0x30;
 
@@ -258,7 +399,7 @@ int main(int argc, char* argv[])
     if (c == '\n') {
         fprintf(stderr, "Unexpected double new line");
         Cleanup(file, numNodes, nodes, 0);
-        return 1;
+        return 0;
     }
     // Read node names
     while (true) {
@@ -266,7 +407,7 @@ int main(int argc, char* argv[])
             if (nodeCh == 0) {
                 fprintf(stderr, "Empty node name");
                 Cleanup(file, numNodes, nodes, 0);
-                return 1;
+                return 0;
             }
             nodes[node][nodeCh] = 0;
             if (strcmp(nodes[node], "start") == 0) {
@@ -285,7 +426,7 @@ int main(int argc, char* argv[])
             if (c == '\n') {
                 fprintf(stderr, "Unexpected double new line");
                 Cleanup(file, numNodes, nodes, 0);
-                return 1;
+                return 0;
             }
         }
 
@@ -295,7 +436,7 @@ int main(int argc, char* argv[])
     if (startNode == -1 || endNode == -1) {
         fprintf(stderr, "Start or end node not found");
         Cleanup(file, numNodes, nodes, 0);
-        return 1;
+        return 0;
     }
 
     // Allocate memory for links
@@ -315,7 +456,7 @@ int main(int argc, char* argv[])
     if (c == EOF) {
         fprintf(stderr, "End of file before links");
         Cleanup(file, numNodes, nodes, links);
-        return 1;
+        return 0;
     }
     // Read node names
     while (c != EOF) {
@@ -331,7 +472,7 @@ int main(int argc, char* argv[])
             if (c == ']') {
                 fprintf(stderr, "Empty link, []");
                 Cleanup(file, numNodes, nodes, links);
-                return 1;
+                return 0;
             }
             int bufInd = 0;
             while (c != ']') {
@@ -345,7 +486,7 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "ParseLink failed: (%s, %s)",
                     nodes[node1], nodes[node2]);
                 Cleanup(file, numNodes, nodes, links);
-                return 1;
+                return 0;
             }
 
             /*printf("link ( %s, %s )\n", nodes[node1], nodes[node2]);
@@ -357,7 +498,7 @@ int main(int argc, char* argv[])
         else {
             fprintf(stderr, "Unexpected char %d\n", c);
             Cleanup(file, numNodes, nodes, links);
-            return 1;
+            return 0;
         }
 
         c = fgetc(file);
@@ -368,33 +509,35 @@ int main(int argc, char* argv[])
     std::vector<Path> profitPaths;
     CalcMaxProfitPaths(numNodes, startNode, endNode, links, profitPaths);
 
+    std::vector<Path> profitCycles;
+    FindProfitCycles(numNodes, links, profitCycles);
+
+    // Write profit paths
     FILE* outFile = fopen(argv[2], "w");
     if (!outFile) {
-        fprintf(stderr, "Couldn't open out file: %s", argv[2]);
+        fprintf(stderr, "Couldn't open paths out file: %s", argv[2]);
         Cleanup(0, numNodes, nodes, links);
         return 1;
     }
-    int k = (int)profitPaths.size() < numPaths ?
+
+    int kPaths = (int)profitPaths.size() < numPaths ?
         (int)profitPaths.size() : numPaths;
-    fprintf(outFile, "[\n");
-    for (int i = 0; i < k; i++) {
-        fprintf(outFile, "    [ [%f, %f, %f], [",
-            profitPaths[i].profit.frac,
-            profitPaths[i].profit.flat,
-            profitPaths[i].profit.time);
-        for (int j = 0; j < (int)profitPaths[i].path.size(); j++) {
-            fprintf(outFile, "\"%s\"", nodes[profitPaths[i].path[j]]);
-            if (j != (int)profitPaths[i].path.size() - 1) {
-                fprintf(outFile, ", ");
-            }
-        }
-        fprintf(outFile, "] ]");
-        if (i != k - 1) {
-            fprintf(outFile, ",");
-        }
-        fprintf(outFile, "\n");
+    WritePaths(outFile, nodes, profitPaths, kPaths);
+
+    fclose(outFile);
+
+    // Write profit cycles
+    outFile = fopen(argv[3], "w");
+    if (!outFile) {
+        fprintf(stderr, "Couldn't open cycles out file: %s", argv[3]);
+        Cleanup(0, numNodes, nodes, links);
+        return 1;
     }
-    fprintf(outFile, "]");
+
+    int kCycles = (int)profitCycles.size() < numCycles ?
+        (int)profitCycles.size() : numCycles;
+    WritePaths(outFile, nodes, profitCycles, kCycles);
+
     fclose(outFile);
 
     Cleanup(0, numNodes, nodes, links);

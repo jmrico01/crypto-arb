@@ -178,10 +178,23 @@ app.get("/depth", function(req, res) {
 
 app.get("/profits", function (req, res) {
     var threshold = parseFloat(req.query.threshold);
+    if (isNaN(threshold)) {
+        res.sendStatus(400);
+    }
     res.send(analyzer.PastThreshold(threshold));
 });
 
 app.get("/profitPaths", function(req, res) {
     var numPaths = parseInt(req.query.numPaths);
+    if (isNaN(numPaths)) {
+        res.sendStatus(400);
+    }
     res.send(profits.GetMaxProfitPaths(numPaths));
+});
+app.get("/profitCycles", function(req, res) {
+    var numCycles = parseInt(req.query.numCycles);
+    if (isNaN(numCycles)) {
+        res.sendStatus(400);
+    }
+    res.send(profits.GetMaxProfitCycles(numCycles));
 });
