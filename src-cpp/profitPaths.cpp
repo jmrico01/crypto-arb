@@ -25,7 +25,7 @@ struct Path {
 
 bool PathContainsNode(const std::vector<int>& path, int node)
 {
-    for (int i = 0; i < path.size(); i++) {
+    for (int i = 0; i < (int)path.size(); i++) {
         if (path[i] == node) {
             return true;
         }
@@ -46,7 +46,7 @@ Link AddLinkProfit(Link p1, Link p2)
 Link CalcPathProfit(const std::vector<int>& path, Link** links)
 {
     Link profit = { 1.0, 0.00, 0.0 };
-    for (int i = 1; i < path.size(); i++) {
+    for (int i = 1; i < (int)path.size(); i++) {
         Link link = links[path[i-1]][path[i]];
         profit.frac *= link.frac;
         profit.flat = profit.flat * link.frac + link.flat;
@@ -228,7 +228,7 @@ int main(int argc, char* argv[])
         Cleanup(file, 0, 0, 0);
         return 1;
     }
-    uint numNodes = 0;
+    int numNodes = 0;
 
     // Read number of nodes
     while (c != '\n') {
@@ -374,16 +374,17 @@ int main(int argc, char* argv[])
         Cleanup(0, numNodes, nodes, links);
         return 1;
     }
-    int k = profitPaths.size() < numPaths ? profitPaths.size() : numPaths;
+    int k = (int)profitPaths.size() < numPaths ?
+        (int)profitPaths.size() : numPaths;
     fprintf(outFile, "[\n");
     for (int i = 0; i < k; i++) {
         fprintf(outFile, "    [ [%f, %f, %f], [",
             profitPaths[i].profit.frac,
             profitPaths[i].profit.flat,
             profitPaths[i].profit.time);
-        for (int j = 0; j < profitPaths[i].path.size(); j++) {
+        for (int j = 0; j < (int)profitPaths[i].path.size(); j++) {
             fprintf(outFile, "\"%s\"", nodes[profitPaths[i].path[j]]);
-            if (j != profitPaths[i].path.size() - 1) {
+            if (j != (int)profitPaths[i].path.size() - 1) {
                 fprintf(outFile, ", ");
             }
         }
