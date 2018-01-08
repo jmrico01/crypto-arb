@@ -1,7 +1,8 @@
 const UPDATE_TIME = 1.0; // seconds
 const MAX_PATHS = 100;
-const PROFIT_GRAPH_FILE = "profit-graph.data";
-const PROFIT_PATHS_FILE = "profit-paths.json";
+const PROFIT_PATHS_PROGRAM = "build/profitPaths";
+const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
+const PROFIT_PATHS_FILE = "temp/profit-paths.json";
 
 const fs = require("fs");
 const childProcess = require("child_process");
@@ -146,15 +147,15 @@ function UpdateExchangeLinks()
         }
 
         const profitPathsProc = childProcess.execFile(
-            "./profitPaths", [
+            PROFIT_PATHS_PROGRAM, [
                 PROFIT_GRAPH_FILE,
                 PROFIT_PATHS_FILE,
                 MAX_PATHS.toString(),
             ],
             function(error, stdout, stderr) {
                 if (error) {
-                    //console.log("Error in profit paths calculation");
-                    //console.log(error);
+                    console.log("Error in profit paths calculation");
+                    console.log(error);
                     return;
                 }
                 if (stdout !== "") {
