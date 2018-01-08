@@ -355,7 +355,7 @@ int main(int argc, char* argv[])
                 links[node1][node2].time);*/
         }
         else {
-            fprintf(stderr, "Unexpected char %d\n" + c);
+            fprintf(stderr, "Unexpected char %d\n", c);
             Cleanup(file, numNodes, nodes, links);
             return 1;
         }
