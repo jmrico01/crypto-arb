@@ -13,14 +13,14 @@ const profits = require("./profits");
 
 const sites = {
     "Bitstamp": {
-        enabled: false,
+        enabled: true,
         module: bitstamp,
         entryParser: function(entry) {
             return entry;
         }
     },
     "CEX": {
-        enabled: false,
+        enabled: true,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
@@ -31,14 +31,14 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: false,
+        enabled: true,
         module: kraken,
         entryParser: function(entry) {
             return entry;
         }
     },
     "OKCoin": {
-        enabled: false,
+        enabled: true,
         module: okcoin,
         entryParser: function(entry) {
             return entry;
@@ -184,17 +184,32 @@ app.get("/profits", function (req, res) {
     res.send(analyzer.PastThreshold(threshold));
 });
 
-app.get("/profitPaths", function(req, res) {
-    var numPaths = parseInt(req.query.numPaths);
-    if (isNaN(numPaths)) {
+function HandlePathsRequest(type, req, res)
+{
+    var k = parseInt(req.query.k);
+    var order = req.query.order;
+    var invest = parseFloat(req.query.invest);
+    if (isNaN(k)) {
         res.sendStatus(400);
+        return;
     }
-    res.send(profits.GetMaxProfitPaths(numPaths));
+    if (order !== "absolute" && order !== "invest") {
+        res.sendStatus(400);
+        return;
+    }
+    if (order === "invest") {
+        if (isNaN(invest)) {
+            res.sendStatus(400);
+            return;
+        }
+    }
+
+    res.send(profits.GetMaxProfitPaths(type, k, order, invest));
+}
+
+app.get("/profitPaths", function(req, res) {
+    HandlePathsRequest("paths", req, res);
 });
 app.get("/profitCycles", function(req, res) {
-    var numCycles = parseInt(req.query.numCycles);
-    if (isNaN(numCycles)) {
-        res.sendStatus(400);
-    }
-    res.send(profits.GetMaxProfitCycles(numCycles));
+    HandlePathsRequest("cycles", req, res);
 });

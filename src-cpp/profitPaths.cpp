@@ -72,7 +72,7 @@ bool ComparePaths(const Path& p1, const Path& p2)
     }
 }
 
-void CalcMaxProfitPaths(
+void FindProfitPaths(
     int numNodes, int src, int dst, Link** links,
     std::vector<Path>& profitPaths)
 {
@@ -107,7 +107,9 @@ void CalcMaxProfitPaths(
             // At this point, paths are implicitly sorted
             // by their length, which might be useful for something.
             Link profit = CalcPathProfit(paths[pathID], links);
-            profitPaths.push_back({ profit, paths[pathID] });
+            if (profit.frac > 1.0f) {
+                profitPaths.push_back({ profit, paths[pathID] });
+            }
             continue;
         }
 
@@ -124,7 +126,7 @@ void CalcMaxProfitPaths(
             newPath.push_back(i);
             int newPathID = freeID;
             if (newPathID == -1) {
-                newPathID = paths.size();
+                newPathID = (int)paths.size();
                 paths.push_back(newPath);
             }
             else {
@@ -272,20 +274,20 @@ bool ParseLink(char* buf, Link* link)
 
     for (int i = 0; i < LINK_FIELDS; i++) {
         char* e;
-        float field = (float)strtod(fields[i], &e);
+        float fieldVal = (float)strtod(fields[i], &e);
         if (*e != '\0') {
             fprintf(stderr, "Field strtod parse failed\n");
             return false;
         }
 
         if (i == 0) {
-            link->frac = field;
+            link->frac = fieldVal;
         }
         else if (i == 1) {
-            link->flat = field;
+            link->flat = fieldVal;
         }
         else if (i == 2) {
-            link->time = field;
+            link->time = fieldVal;
         }
     }
 
@@ -339,20 +341,9 @@ void WritePaths(
 
 int main(int argc, char* argv[])
 {
-    if (argc != 6) {
-        fprintf(stderr, "Expected 5 arguments: %s",
-            "inFile, pathsFile, cyclesFile, numPaths, numCycles");
-        return 1;
-    }
-    char* e;
-    int numPaths = (int)strtol(argv[4], &e, 10);
-    if (*e != '\0') {
-        fprintf(stderr, "Invalid numPaths argument");
-        return 1;
-    }
-    int numCycles = (int)strtol(argv[5], &e, 10);
-    if (*e != '\0') {
-        fprintf(stderr, "Invalid numCycles argument");
+    if (argc != 4) {
+        fprintf(stderr, "Expected 3 arguments: %s",
+            "inFile, pathsFile, cyclesFile");
         return 1;
     }
 
@@ -476,7 +467,7 @@ int main(int argc, char* argv[])
             }
             int bufInd = 0;
             while (c != ']') {
-                linkBuf[bufInd++] = c;
+                linkBuf[bufInd++] = (char)c;
                 c = fgetc(file);
             }
             linkBuf[bufInd] = 0;
@@ -507,7 +498,7 @@ int main(int argc, char* argv[])
     fclose(file);
 
     std::vector<Path> profitPaths;
-    CalcMaxProfitPaths(numNodes, startNode, endNode, links, profitPaths);
+    FindProfitPaths(numNodes, startNode, endNode, links, profitPaths);
 
     std::vector<Path> profitCycles;
     FindProfitCycles(numNodes, links, profitCycles);
@@ -519,11 +510,7 @@ int main(int argc, char* argv[])
         Cleanup(0, numNodes, nodes, links);
         return 1;
     }
-
-    int kPaths = (int)profitPaths.size() < numPaths ?
-        (int)profitPaths.size() : numPaths;
-    WritePaths(outFile, nodes, profitPaths, kPaths);
-
+    WritePaths(outFile, nodes, profitPaths, (int)profitPaths.size());
     fclose(outFile);
 
     // Write profit cycles
@@ -533,11 +520,7 @@ int main(int argc, char* argv[])
         Cleanup(0, numNodes, nodes, links);
         return 1;
     }
-
-    int kCycles = (int)profitCycles.size() < numCycles ?
-        (int)profitCycles.size() : numCycles;
-    WritePaths(outFile, nodes, profitCycles, kCycles);
-
+    WritePaths(outFile, nodes, profitCycles, (int)profitCycles.size());
     fclose(outFile);
 
     Cleanup(0, numNodes, nodes, links);

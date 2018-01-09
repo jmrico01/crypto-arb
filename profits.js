@@ -1,6 +1,4 @@
 const UPDATE_TIME = 1.0; // seconds
-const MAX_PATHS = 50;
-const MAX_CYCLES = 50;
 const PROFIT_PATHS_PROGRAM = "build/profitPaths";
 const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
@@ -17,12 +15,6 @@ var sites = {};
 
 var nodes = {};
 var links = {};
-
-var profitPaths = ordHash.Create(function(profit1, profit2) {
-    if (profit1[0] > profit2[0]) return -1;
-    else if (profit1[0] < profit2[0]) return 1;
-    else return 0;
-});
 
 function IsFiat(currency)
 {
@@ -70,29 +62,42 @@ function GetExchangeRate(site, curr1, curr2)
     }
 }
 
-function GetMaxProfitPaths(numPaths)
+function GetMaxProfitPaths(type, k, order, invest)
 {
-    var k = Math.min(numPaths, MAX_PATHS);
-    var profitPaths = [];
+    var paths = [];
+    var pathsFile;
+
+    if (type === "paths") {
+        pathsFile = PROFIT_PATHS_FILE;
+    }
+    else if (type === "cycles") {
+        pathsFile = PROFIT_CYCLES_FILE;
+    }
+    else {
+        console.assert(false, "Wrong path request type");
+        return [];
+    }
+
     try {
-        profitPaths = JSON.parse(fs.readFileSync(PROFIT_PATHS_FILE));
+        paths = JSON.parse(fs.readFileSync(pathsFile));
     }
     catch (err) {
+        return [];
     }
-    k = Math.min(k, profitPaths.length);
-    return profitPaths.slice(0, k);
-}
-function GetMaxProfitCycles(numCycles)
-{
-    var k = Math.min(numCycles, MAX_CYCLES);
-    var profitCycles = [];
-    try {
-        profitCycles = JSON.parse(fs.readFileSync(PROFIT_CYCLES_FILE));
+
+    if (order === "invest") {
+        paths.sort(function(path1, path2) {
+            var out1 = invest * path1[0][0] - path1[0][1];
+            var out2 = invest * path2[0][0] - path2[0][1];
+
+            if (out1 > out2) return -1;
+            else if (out1 < out2) return 1;
+            else return 0;
+        });
     }
-    catch (err) {
-    }
-    k = Math.min(k, profitCycles.length);
-    return profitCycles.slice(0, k);
+
+    k = Math.min(k, paths.length);
+    return paths.slice(0, k);
 }
 
 function WriteProfitGraph(filePath, callback)
@@ -167,12 +172,11 @@ function UpdateExchangeLinks()
         }
 
         const profitPathsProc = childProcess.execFile(
-            PROFIT_PATHS_PROGRAM, [
+            PROFIT_PATHS_PROGRAM,
+            [
                 PROFIT_GRAPH_FILE,
                 PROFIT_PATHS_FILE,
-                PROFIT_CYCLES_FILE,
-                MAX_PATHS.toString(),
-                MAX_CYCLES.toString()
+                PROFIT_CYCLES_FILE
             ],
             function(error, stdout, stderr) {
                 if (error) {
@@ -356,4 +360,3 @@ function Start(sitesIn)
 
 exports.Start = Start;
 exports.GetMaxProfitPaths = GetMaxProfitPaths;
-exports.GetMaxProfitCycles = GetMaxProfitCycles;
