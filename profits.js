@@ -1,6 +1,6 @@
 const UPDATE_TIME = 1.0; // seconds
 const MAX_PATHS = 50;
-const MAX_CYCLES = 25;
+const MAX_CYCLES = 50;
 const PROFIT_PATHS_PROGRAM = "build/profitPaths";
 const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
@@ -73,14 +73,24 @@ function GetExchangeRate(site, curr1, curr2)
 function GetMaxProfitPaths(numPaths)
 {
     var k = Math.min(numPaths, MAX_PATHS);
-    var profitPaths = JSON.parse(fs.readFileSync(PROFIT_PATHS_FILE));
+    var profitPaths = [];
+    try {
+        profitPaths = JSON.parse(fs.readFileSync(PROFIT_PATHS_FILE));
+    }
+    catch (err) {
+    }
     k = Math.min(k, profitPaths.length);
     return profitPaths.slice(0, k);
 }
 function GetMaxProfitCycles(numCycles)
 {
     var k = Math.min(numCycles, MAX_CYCLES);
-    var profitCycles = JSON.parse(fs.readFileSync(PROFIT_CYCLES_FILE));
+    var profitCycles = [];
+    try {
+        profitCycles = JSON.parse(fs.readFileSync(PROFIT_CYCLES_FILE));
+    }
+    catch (err) {
+    }
     k = Math.min(k, profitCycles.length);
     return profitCycles.slice(0, k);
 }
@@ -268,18 +278,22 @@ function Start(sitesIn)
     // TODO this info should probably be in fees.js
     const FEE_BOFA_WIRE = [0.0, 45.00];
     const depositNodes = [
+        "Bitstamp-USD",
         "CEX-USD",
         "Kraken-USD"
     ];
     const depositMethod = {
+        "Bitstamp": "wire",
         "CEX": "card",
-        "Kraken": "wire"
+        "Kraken": "wire",
     };
     const withdrawNodes = [
+        "Bitstamp-USD",
         "CEX-USD",
         "Kraken-USD"
     ];
     const withdrawMethod = {
+        "Bitstamp": "wire",
         "CEX": "card",
         "Kraken": "wire"
     };
@@ -288,6 +302,9 @@ function Start(sitesIn)
     for (var i = 0; i < depositNodes.length; i++) {
         var site = depositNodes[i].split("-")[0];
         var curr = depositNodes[i].split("-")[1];
+        if (!sites[site].enabled) {
+            continue;
+        }
 
         var feeWithdraw = [0.0, 0.00];
         if (depositMethod[site] === "wire") {
@@ -305,6 +322,9 @@ function Start(sitesIn)
     for (var i = 0; i < withdrawNodes.length; i++) {
         var site = withdrawNodes[i].split("-")[0];
         var curr = withdrawNodes[i].split("-")[1];
+        if (!sites[site].enabled) {
+            continue;
+        }
 
         var feeWithdraw = fees.Withdraw(site, curr);
         // unclear whether there will be deposit fees here

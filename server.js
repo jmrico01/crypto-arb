@@ -13,14 +13,14 @@ const profits = require("./profits");
 
 const sites = {
     "Bitstamp": {
-        enabled: true,
+        enabled: false,
         module: bitstamp,
         entryParser: function(entry) {
             return entry;
         }
     },
     "CEX": {
-        enabled: true,
+        enabled: false,
         module: cex,
         entryParser: function(entry) {
             const DECIMALS = 4;
@@ -31,14 +31,14 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: true,
+        enabled: false,
         module: kraken,
         entryParser: function(entry) {
             return entry;
         }
     },
     "OKCoin": {
-        enabled: true,
+        enabled: false,
         module: okcoin,
         entryParser: function(entry) {
             return entry;

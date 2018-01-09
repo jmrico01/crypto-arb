@@ -1,18 +1,15 @@
 * {
     font-family: sans-serif;
-}
-
-html {
-    margin: 5px;
-    padding: 0;
-}
-body {
     margin: 0;
     padding: 0;
 }
 
 h1 {
+    width: 100%;
+    text-align: center;
     font-size: 22pt;
+    margin-top: 20px;
+    margin-bottom: 10px;
 }
 
 button {
@@ -44,6 +41,53 @@ button:hover {
     margin-bottom: 20px;
 }
 
+/* Profit paths */
+#profitPaths {
+    width: 100%;
+    text-align: center;
+    /*overflow: hidden;*/
+}
+.path {
+    width: 100%;
+    height: 100px;
+
+    -webkit-transition-duration: 0.5s; /* Safari */
+    transition-duration: 0.5s;
+}
+.path:hover {
+    background-color: #DDD;
+}
+.pathEl {
+    position: relative;
+    display: inline-block;
+    height: 100%;
+    vertical-align: top;
+}
+.pathStart, .pathArrow, .pathNode, .pathDots, .pathEnd {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.pathStart, .pathEnd {
+    width: 100%;
+    font-size: 10pt;
+}
+.pathNode {
+    width: 90%;
+    display: inline-block;
+    padding: 5px;
+    border-color: #000;
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 5px;
+    font-size: 10pt;
+}
+.pathDots {
+    font-weight: bold;
+}
+
+/* Max profits */
 #profits {
     width: 100%;
     /*height: 150pt;*/
@@ -88,6 +132,7 @@ button:hover {
     margin-bottom: 5px;
 }
 
+/* Market data */
 #topBar {
     width: 100%;
     height: 120px;
