@@ -5,21 +5,23 @@ var $pathEndProto;
 
 function CreatePathArrow(width)
 {
-    var $pathArrow = $pathArrowProto; // TODO duplicate thingy
+    var $pathArrow = $pathArrowProto.clone();
     $pathArrow.width(width);
     $pathArrow.find("line").attr("x2", (width * 0.85).toString());
 
     return $pathArrow;
 }
 
-function ClearProfitPaths()
+function ClearProfitPaths(parent)
 {
-    $("#profitPaths").html("");
+    //return;
+    $(parent).html("");
 }
 
-function DisplayProfitPaths(paths)
+function DisplayProfitPaths(parent, paths)
 {
-    var $profitPaths = $("#profitPaths");
+    //return;
+    var $profitPaths = $(parent);
 
     for (var i = 0; i < paths.length; i++) {
         var $path = $("<div class=\"path\"></div>");
@@ -31,11 +33,11 @@ function DisplayProfitPaths(paths)
             $path.append($pathEl);
 
             if (el === 0) {
-                var $pathStart = $pathStartProto; // TODO dup
+                var $pathStart = $pathStartProto.clone();
                 $pathEl.append($pathStart);
             }
             else if (el === (pathEls - 1)) {
-                var $pathEnd = $pathEndProto; // TODO dup
+                var $pathEnd = $pathEndProto.clone();
                 $pathEnd.find(".endPerc").html(
                     ((paths[i][0][0] - 1.0) * 100.0).toFixed(2));
                 $pathEnd.find(".endFlat").html(
@@ -47,7 +49,7 @@ function DisplayProfitPaths(paths)
             }
             else {
                 var n = el / 2;
-                var $pathNode = $pathNodeProto;
+                var $pathNode = $pathNodeProto.clone();
                 $pathNode.find(".pathNodeSite").html(
                     paths[i][1][n].split("-")[0]);
                 $pathNode.find(".pathNodeCurrency").html(

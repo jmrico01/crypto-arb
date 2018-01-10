@@ -16,6 +16,12 @@
         <script src="fetch-data.js"></script>
     </head>
     <body>
+        <br>
+        <div style="text-align: center; font-size: 14pt;">
+            <input id="testInput" type="text" name="inputUSD" value="1000">
+            <br>
+            Investment (USD)
+        </div>
         <h1>Max Profit Paths</h1>
         <div id="profitPaths">
             <div class="path">
@@ -97,40 +103,8 @@
         <br>
         <hr>
 
-        <h1>Top Profits</h1>
-        <div id="profits">
-            <div id="pBar1">
-                <!-- profit entry prototype, duplicated by index.js -->
-                <div id="profitProto" class="profitEntry">
-                    <div class="profitPercentage">
-                        <span class="profitCrypto">???</span> :
-                        <span class="profitPerc">X</span>%
-                        ( -$<span class="profitFlatFee">X</span> )
-                    </div>
-                    <div class="profitBuyText">
-                        <span class="profitSite1">Site1</span>
-                        ( $<span class="profitSite1Price">X</span> )
-                    </div>
-                    <div class="profitSellText">
-                        <span class="profitSite2">Site2</span>
-                        ( $<span class="profitSite2Price">X</span> )
-                    </div>
-                    <div class="testOutputText">
-                        Test:
-                        $<span class="testOutput">X</span>
-                        ( <span class="testProfit">X</span>% )
-                    </div>
-                </div>
-            </div>
-            <div id="pBar2"></div>
-            <div id="pBar3"></div>
-        </div>
-        <br>
-        <div style="text-align: center; font-size: 14pt;">
-            <input id="testInput" type="text" name="inputUSD" value="1000">
-            <br>
-            Test Quantity (USD)
-        </div>
+        <h1>Max Profit Cycles</h1>
+        <div id="profitCycles"></div>
         <br>
         <hr>
         
@@ -163,6 +137,40 @@
                     $<span id="maxBid">?</span> (-<span id="maxBidAge">?</span>s)
                 </div>
             </div>
+        </div>
+        <div id="marketDepthPlot">
+        </div>
+        <br>
+        <br>
+        <hr>
+        
+        <h1>Top Profits (OLD)</h1>
+        <div id="profits">
+            <div id="pBar1">
+                <!-- profit entry prototype, duplicated by index.js -->
+                <div id="profitProto" class="profitEntry">
+                    <div class="profitPercentage">
+                        <span class="profitCrypto">???</span> :
+                        <span class="profitPerc">X</span>%
+                        ( -$<span class="profitFlatFee">X</span> )
+                    </div>
+                    <div class="profitBuyText">
+                        <span class="profitSite1">Site1</span>
+                        ( $<span class="profitSite1Price">X</span> )
+                    </div>
+                    <div class="profitSellText">
+                        <span class="profitSite2">Site2</span>
+                        ( $<span class="profitSite2Price">X</span> )
+                    </div>
+                    <div class="testOutputText">
+                        Test:
+                        $<span class="testOutput">X</span>
+                        ( <span class="testProfit">X</span>% )
+                    </div>
+                </div>
+            </div>
+            <div id="pBar2"></div>
+            <div id="pBar3"></div>
         </div>
     </body>
 </html>

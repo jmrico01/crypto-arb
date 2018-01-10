@@ -246,9 +246,19 @@ void FindProfitCycles(
         if (profit.frac > 1.0) {
             profitCycles.push_back({ profit, cycles[i] });
         }
+        if (profit.time == 0.0) {
+            printf("Instant cycle\n");
+            printf("size %d\n", (int)cycles[i].size());
+        }
     }
 
     std::sort(profitCycles.begin(), profitCycles.end(), ComparePaths);
+    
+    for (int i = 0; i < (int)profitCycles.size(); i++) {
+        if (profitCycles[i].profit.time == 0.0) {
+            printf("OMG INSTANT PROFIT!\n");
+        }
+    }
 }
 
 bool ParseLink(char* buf, Link* link)

@@ -57,7 +57,7 @@ function Plot(datasets, xMin, xMax)
         .x(function(d) { return xScale(d[0]); })
         .y(function(d) { return yScale(d[1]); });
 
-    var svg = d3.select("body").append("svg")
+    var svg = d3.select("#marketDepthPlot").append("svg")
         .attr("id", "depthPlot")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)

@@ -2,7 +2,7 @@ const N_PROFITS = 9;
 const PROFIT_THRESHOLD = 0.0;
 
 const NUM_PATHS = 5;
-const NUM_CYCLES = 20;
+const NUM_CYCLES = 5;
 
 var fetchDataInterval = null;
 var site = null;
@@ -79,13 +79,17 @@ function FetchData()
     })
     
     // Get profit paths
+    var order = "order=absolute";
+    if (!Number.isNaN(testInput)) {
+        order = "order=invest&invest=" + testInput.toString();
+    }
     $.ajax({
         dataType: "json",
-        url: "profitPaths?numPaths=" + NUM_PATHS.toString(),
+        url: "profitPaths?k=" + NUM_PATHS.toString() + "&" + order,
         success: function(profitPaths) {
             //console.log(profitPaths);
-            ClearProfitPaths();
-            DisplayProfitPaths(profitPaths);
+            ClearProfitPaths("#profitPaths");
+            DisplayProfitPaths("#profitPaths", profitPaths);
         },
         error: function(req, status, err) {
             console.log("No profit paths");
@@ -94,9 +98,11 @@ function FetchData()
     // Get profit cycles
     $.ajax({
         dataType: "json",
-        url: "profitCycles?numCycles=" + NUM_CYCLES.toString(),
+        url: "profitCycles?k=" + NUM_CYCLES.toString() + "&" + order,
         success: function(profitCycles) {
             //console.log(profitCycles);
+            ClearProfitPaths("#profitCycles");
+            DisplayProfitPaths("#profitCycles", profitCycles);
         },
         error: function(req, status, err) {
             console.log("No profit cycles");

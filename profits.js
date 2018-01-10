@@ -159,7 +159,7 @@ function UpdateExchangeLinks()
             links[node1][node2] = [
                 exchangeRate * (1.0 - feeExchange[0]),
                 feeExchange[1],
-                0.1
+                0.0 // TODO instant for now
             ];
         }
     }
@@ -264,7 +264,8 @@ function Start(sitesIn)
                 link[0] = (1.0 - feeWithdraw1[0]) * (1.0 - feeDeposit2[0]);
                 link[1] = feeWithdraw1[1] * (1.0 - feeDeposit2[0])
                     + feeDeposit2[1];
-                link[2] = 1.0; // ...
+                link[2] = 60.0 * 60.0; // TODO about an hour for now
+                                       // Estimate deposit times here
             }
             else {
                 // No can do
