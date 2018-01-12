@@ -1,5 +1,6 @@
-const UPDATE_TIME = 1.0; // seconds
-const PROFIT_PATHS_PROGRAM = "build/profitPaths";
+const UPDATE_TIME = 0.2;
+const WRITE_TIME = 1.0;
+const PROFIT_PATHS_PROGRAM = "build/profit_paths";
 const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
 const PROFIT_CYCLES_FILE = "temp/profit-cycles.json";
@@ -15,6 +16,8 @@ var sites = {};
 
 var nodes = {};
 var links = {};
+
+var profitCycles = {};
 
 function IsFiat(currency)
 {
@@ -100,6 +103,47 @@ function GetMaxProfitPaths(type, k, order, invest)
     return paths.slice(0, k);
 }
 
+function CalcPathProfit(path)
+{
+    var profit = [1.0, 0.00, 0.0];
+    for (var i = 1; i < cycle.length; i++) {
+        var link = links[cycle[i-1]][cycle[i]];
+        profit[0] *= link[0];
+        profit[1] = profit[1] * link[0] + link[1];
+        profit[2] += link[2];
+    }
+
+    return profit;
+}
+
+function CalcCycleProfit(cycle)
+{
+    var profit = CalcPathProfit(cycle);
+
+    var link = links[cycle[cycle.length-1]][cycle[0]];
+    profit[0] *= link[0];
+    profit[1] = profit[1] * link[0] + link[1];
+    profit[2] += link[2];
+
+    return profit;
+}
+
+function AnalyzeProfitCycles()
+{
+    for (var i = 0; i < profitCycles.length; i++) {
+        if (profitCycles[i][0][2] === 0.0) {
+            var profit = CalcCycleProfit(profitCycles[i][1]);
+            console.log("INSTANT PROFIT! (supposedly)");
+            if (profit[2] === 0.0) {
+                console.log("INSTANT PROFIT!");
+                console.log(profitCycles[i][0]);
+                console.log(profit);
+                console.log(profitCycles[i][1]);
+            }
+        }
+    }
+}
+
 function WriteProfitGraph(filePath, callback)
 {
     var dataStr = "";
@@ -163,32 +207,6 @@ function UpdateExchangeLinks()
             ];
         }
     }
-
-    WriteProfitGraph(PROFIT_GRAPH_FILE, function(err) {
-        if (err) {
-            console.log("Error writing profit graph");
-            console.log(err);
-            return;
-        }
-
-        const profitPathsProc = childProcess.execFile(
-            PROFIT_PATHS_PROGRAM,
-            [
-                PROFIT_GRAPH_FILE,
-                PROFIT_PATHS_FILE,
-                PROFIT_CYCLES_FILE
-            ],
-            function(error, stdout, stderr) {
-                if (error) {
-                    console.log("Error in profit paths calculation");
-                    console.log(error);
-                    return;
-                }
-                if (stdout !== "") {
-                    console.log(stdout);
-                }
-            });
-    });
 }
 
 function Start(sitesIn)
@@ -279,7 +297,7 @@ function Start(sitesIn)
         }
     }
 
-    // Create and link start and end nodes
+    // Create and link BofA node
     // TODO this info should probably be in fees.js
     const FEE_BOFA_WIRE = [0.0, 45.00];
     const depositNodes = [
@@ -302,8 +320,8 @@ function Start(sitesIn)
         "CEX": "card",
         "Kraken": "wire"
     };
-    nodes["start"] = [];
-    links["start"] = {};
+    nodes["BofA-USD"] = [];
+    links["BofA-USD"] = {};
     for (var i = 0; i < depositNodes.length; i++) {
         var site = depositNodes[i].split("-")[0];
         var curr = depositNodes[i].split("-")[1];
@@ -317,13 +335,12 @@ function Start(sitesIn)
         }
         var feeDeposit = fees.Deposit(site, curr);
 
-        links["start"][depositNodes[i]] = [
+        links["BofA-USD"][depositNodes[i]] = [
             (1.0 - feeWithdraw[0]) * (1.0 - feeDeposit[0]),
             feeWithdraw[1] * (1.0 - feeDeposit[0]),
-            10.0
+            60.0 * 60.0 * 24.0 * 7.0 // one week
         ];
     }
-    nodes["end"] = [];
     for (var i = 0; i < withdrawNodes.length; i++) {
         var site = withdrawNodes[i].split("-")[0];
         var curr = withdrawNodes[i].split("-")[1];
@@ -338,25 +355,69 @@ function Start(sitesIn)
         if (!links.hasOwnProperty(withdrawNodes[i])) {
             links[withdrawNodes[i]] = {};
         }
-        links[withdrawNodes[i]]["end"] = [
+        links[withdrawNodes[i]]["BofA-USD"] = [
             (1.0 - feeWithdraw[0]) * (1.0 - feeDeposit[0]),
             feeWithdraw[1] * (1.0 - feeDeposit[0]),
-            10.0
+            60.0 * 60.0 * 24.0 * 7.0 // one week
         ];
     }
 
     var nNodes = Object.keys(nodes).length;
-    var nEdges = 0;
+    var nLinks = 0;
     for (var n1 in links) {
         for (var n2 in links) {
-            nEdges++;
+            nLinks++;
         }
     }
-    console.log("profits.js graph created");
-    console.log("Nodes: " + nNodes);
-    console.log("Edges: " + nEdges);
+    console.log("profits graph created");
+    console.log("  nodes: " + nNodes);
+    console.log("  links: " + nLinks);
 
     setInterval(UpdateExchangeLinks, UPDATE_TIME * 1000);
+    setInterval(function() {
+        WriteProfitGraph(PROFIT_GRAPH_FILE, function(err) {
+            if (err) {
+                console.log("Error writing profit graph");
+                console.log(err);
+                return;
+            }
+
+            const profitPathsProc = childProcess.spawn(
+                PROFIT_PATHS_PROGRAM,
+                [
+                    PROFIT_GRAPH_FILE,
+                    PROFIT_PATHS_FILE,
+                    PROFIT_CYCLES_FILE
+                ]
+            );
+            profitPathsProc.stdout.on("data", function(data) {
+                process.stdout.write(data.toString());
+            });
+            profitPathsProc.stderr.on("data", function(data) {
+                console.log(data.toString());
+            });
+            profitPathsProc.on("close", function(code) {
+                if (code !== 0) {
+                    console.log("profit paths process exited with code " + code);
+                }
+
+                fs.readFile(PROFIT_CYCLES_FILE, function(err, data) {
+                    if (err) {
+                        console.log("Error reading profit cycles file: " + err);
+                    }
+
+                    try {
+                        profitCycles = JSON.parse(data);
+                    }
+                    catch (err) {
+                        return;
+                    }
+
+                    AnalyzeProfitCycles();
+                });
+            })
+        });
+    }, WRITE_TIME * 1000);
 }
 
 exports.Start = Start;

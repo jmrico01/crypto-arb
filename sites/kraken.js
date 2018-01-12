@@ -28,59 +28,43 @@ var POLL_TICKER_TIME = 0.2; // seconds
 
 var pollDepthInterval = null;
 // seconds it takes to refresh full market depth data for all currency pairs
-var POLL_DEPTH_TIME = 5.0;
+var POLL_DEPTH_TIME = 8.0;
 var nextPair = 0;
 
-// NOTE: these pair conversions don't support crypto-crypto pairs
+var toStdPair = {};
+var toKrakenPair = {};
+function RegisterPair(kPair, kAltname)
+{
+    if (kPair.indexOf(".d") !== -1) {
+        // unsupported
+        return;
+    }
+
+    kAltname = kAltname.replace("XBT", "BTC");
+    kAltname = kAltname.replace("XDG", "DOGE");
+    // TODO this is the weakest link
+    // (assumes that curr2 will always be 3 characters)
+    var curr1 = kAltname.slice(0, kAltname.length - 3);
+    var curr2 = kAltname.slice(kAltname.length - 3, kAltname.length);
+    var pair = curr1 + "-" + curr2;
+
+    toKrakenPair[pair] = kPair;
+    toStdPair[kPair] = pair;
+}
 
 function StdPairToKraken(pair)
 {
-    var p = pair.split("-");
-    if (p[0] === "BCH" || p[0] === "DASH") {
-        return p[0] + p[1];
-    }
-    if (p[0] === "BTC") {
-        return "XXBT" + "Z" + p[1];
-    }
-    if (p[0] === "USDT") {
-        return p[0] + "Z" + p[1];
-    }
-
-    return "X" + p[0] + "Z" + p[1];
-}
-
-// return null on unrecognized/unsupported pair
-function KrakenPairToStd(pair)
-{
-    if (pair.substring(0, 3) === "BCH") {
-        return "BCH-" + pair.substring(3, pair.length);
-    }
-    if (pair.substring(0, 3) === "EOS") {
-        return "EOS-" + pair.substring(3, pair.length);
-    }
-    if (pair.substring(0, 3) === "GNO") {
-        return "GNO-" + pair.substring(3, pair.length);
-    }
-    if (pair.substring(0, 4) === "XXBT") {
-        return "BTC-" + pair.substring(5, pair.length);
-    }
-    if (pair.substring(0, 4) === "DASH") {
-        return "DASH-" + pair.substring(4, pair.length);
-    }
-    if (pair.substring(0, 4) === "USDT") {
-        return "USDT-" + pair.substring(5, pair.length);
-    }
-
-    if (pair.length === 8) {
-        return pair.substring(1, 4) + "-" + pair.substring(5, 8);
-    }
-    if (pair.length === 10) {
-        // the .d pairs
+    if (!toKrakenPair.hasOwnProperty(pair)) {
         return null;
     }
-
-    Print("unhandled Kraken pair: " + pair);
-    return null;
+    return toKrakenPair[pair];
+}
+function KrakenPairToStd(kPair)
+{
+    if (!toStdPair.hasOwnProperty(kPair)) {
+        return null;
+    }
+    return toStdPair[kPair];
 }
 
 function ArgsToQueryString(args)
@@ -355,7 +339,7 @@ function Stop()
     clearInterval(pollTickerInterval);
 }
 
-function Start(pairs, callback)
+function Start(callback)
 {
     SubmitPublicRequest("AssetPairs", {}, function(data) {
         if (data.error.length !== 0) {
@@ -363,17 +347,13 @@ function Start(pairs, callback)
             return;
         }
 
-        var supportedPairs = [];
         for (var kPair in data.result) {
+            RegisterPair(kPair, data.result[kPair].altname);
+
             var pair = KrakenPairToStd(kPair);
             if (pair !== null) {
-                supportedPairs.push(pair);
-            }
-        }
-        
-        for (var i = 0; i < pairs.length; i++) {
-            if (supportedPairs.indexOf(pairs[i]) >= 0) {
-                mktData[pairs[i]] = {
+                var kPairTest = StdPairToKraken(pair);
+                mktData[pair] = {
                     asks: ordHash.Create(CompareFloatStrings),
                     bids: ordHash.Create(CompareFloatStrings)
                 };

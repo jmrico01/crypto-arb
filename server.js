@@ -1,4 +1,5 @@
 const fs = require("fs");
+const https = require("https");
 const path = require("path");
 const express = require("express");
 const app = express();
@@ -7,6 +8,8 @@ const bitstamp = require("./sites/bitstamp");
 const cex = require("./sites/cex");
 const kraken = require("./sites/kraken");
 const okcoin = require("./sites/okcoin");
+const poloniex = require("./sites/poloniex");
+const quoine = require("./sites/quoine");
 
 const analyzer = require("./analyzer");
 const profits = require("./profits");
@@ -31,7 +34,7 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: true,
+        enabled: false,
         module: kraken,
         entryParser: function(entry) {
             return entry;
@@ -44,31 +47,28 @@ const sites = {
             return entry;
         }
     },
-};
-
-const enabledCryptos = [
-    "BCH",
-    "BTC",
-    "BTG",
-    "DASH",
-    "ETC",
-    "ETH",
-    "LTC",
-    //"USDT",
-    //"XMR",
-    "XRP",
-    "ZEC"
-];
-const enabledFiats = [
-    "USD"
-];
-
-var pairs = [];
-for (var i = 0; i < enabledFiats.length; i++) {
-    for (var j = 0; j < enabledCryptos.length; j++) {
-        pairs.push(enabledCryptos[j] + "-" + enabledFiats[i]);
+    "Poloniex": {
+        enabled: false,
+        module: poloniex,
+        entryParser: function(entry) {
+            return entry;
+        }
+    },
+    "QUOINEX": {
+        enabled: false,
+        module: quoine.quoinex,
+        entryParser: function(entry) {
+            return entry;
+        }
+    },
+    "QRYPTOS": {
+        enabled: false,
+        module: quoine.qryptos,
+        entryParser: function(entry) {
+            return entry;
+        }
     }
-}
+};
 
 // Start site modules, which pull in data from each API
 var siteNames = Object.keys(sites);
@@ -85,8 +85,17 @@ function StartSiteRecursive(idx, callback)
         return;
     }
 
-    console.log("starting " + site);
-    sites[site].module.Start(pairs, function() {
+    sites[site].module.Start(function() {
+        for (var pair in sites[site].module.data) {
+            var pairSplit = pair.split("-");
+            for (var i = 0; i < 2; i++) {
+                if (!currencies.hasOwnProperty(pairSplit[i])) {
+                    console.log("WARNING: unrecognized currency");
+                    console.log("    " + site + ": " + pairSplit[i]
+                        + " in pair " + pairSplit);
+                }
+            }
+        }
         if (idx + 1 < siteNames.length) {
             StartSiteRecursive(idx + 1, callback);
         }
@@ -96,14 +105,65 @@ function StartSiteRecursive(idx, callback)
     });
 }
 
-StartSiteRecursive(0, function() {
-    console.log("All sites started");
+// Standardized currency symbols and info
+var currencies = {
+    "USD": { name: "US Dollar" },
+    "CAD": { name: "Canadian Dollar" },
+    "EUR": { name: "Euro" },
+    "GBP": { name: "British Pound" },
+    "RUB": { name: "Russian Ruble" },
+    "INR": { name: "Indian Rupee" },
+    "CNY": { name: "Chinese Yuan" },
+    "JPY": { name: "Japanese Yen" },
+    "HKD": { name: "Hong Kong Dollar" },
+    "PHP": { name: "Philippine Piso" },
+    "SGD": { name: "Singapore Dollar" },
+    "IDR": { name: "Indonesian Rupiah" },
+    "AUD": { name: "Australian Dollar" }
+};
+// Get cryptocurrencies from CoinMarketCap
+//   https://coinmarketcap.com/
+const coinMarketCapTicker = "https://api.coinmarketcap.com/v1/ticker/?limit=0";
+https.get(coinMarketCapTicker, function(res) {
+    if (res.statusCode !== 200) {
+        Print("CoinMarketCap ticker returned " + res.statusCode);
+        return;
+    }
 
-    // Start the analyzer
-    analyzer.Start(sites, pairs);
-    
-    // Start analyzer v2
-    profits.Start(sites);
+    res.setEncoding("utf8");
+    var data = "";
+    res.on("data", function(chunk) {
+        data += chunk;
+    });
+    res.on("end", function() {
+        try {
+            data = JSON.parse(data);
+        }
+        catch (err) {
+            Print("CoinMarketCap ticker JSON parse error " + err);
+            return;
+        }
+
+        for (var i = 0; i < data.length; i++) {
+            currencies[data[i].symbol] = {
+                name: data[i].name,
+                marketCap: data[i].market_cap_usd,
+                supply: data[i].total_supply,
+                time: data[i].last_updated
+            };
+        }
+        console.log("Received CoinMarketCap currency data");
+        
+        StartSiteRecursive(0, function() {
+            console.log("All sites started");
+        
+            // Start the analyzer
+            //analyzer.Start(sites, pairs);
+            
+            // Start analyzer v2
+            profits.Start(sites);
+        });
+    });
 });
 
 app.set("port", 8080);

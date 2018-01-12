@@ -9,7 +9,7 @@ const host = "wss://real.okcoin.com:10440/websocket/okcoinapi";
 
 function Print(msg)
 {
-    console.log("(OKCoin) " + msg);
+    console.log("(OKCoin) " + msg.toString());
 }
 
 function StdPairToOKC(pair)
@@ -217,33 +217,22 @@ function CompareFloatStrings(s1, s2)
     else            return 0;
 }
 
-function Start(pairs, callback)
+function Start(callback)
 {
-    var supportedCryptos = [
-        "BTC",
-        "LTC",
-        "ETH",
-        "ETC",
-        "BCH"
+    // OKCoin has no way to poll for exchange pairs
+    var pairs = [
+        "BTC-USD",
+        "LTC-USD",
+        "ETH-USD",
+        "ETC-USD",
+        "BCH-USD"
     ];
-    var supportedFiats = [
-        "USD"
-    ];
-
-    var supportedPairs = [];
-    for (var i = 0; i < supportedFiats.length; i++) {
-        for (var j = 0; j < supportedCryptos.length; j++) {
-            supportedPairs.push(supportedCryptos[j] + "-" + supportedFiats[i]);
-        }
-    }
 
     for (var i = 0; i < pairs.length; i++) {
-        if (supportedPairs.indexOf(pairs[i]) >= 0) {
-            mktData[pairs[i]] = {
-                asks: ordHash.Create(CompareFloatStrings),
-                bids: ordHash.Create(CompareFloatStrings)
-            };
-        }
+        mktData[pairs[i]] = {
+            asks: ordHash.Create(CompareFloatStrings),
+            bids: ordHash.Create(CompareFloatStrings)
+        };
     }
 
     connection = CreateConnection();
@@ -251,6 +240,4 @@ function Start(pairs, callback)
 }
 
 exports.data = mktData;
-//exports.asks = asks;
-//exports.bids = bids;
 exports.Start = Start;

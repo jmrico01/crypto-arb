@@ -1,5 +1,6 @@
 const fs = require("fs");
 const crypto = require("crypto");
+const https = require("https");
 const WebSocket = require("ws");
 
 const ordHash = require("./../ordered-hash");
@@ -417,42 +418,52 @@ function CompareFloats(f1, f2)
     else                return 0;
 }
 
-function Start(pairs, callback)
+function Start(callback)
 {
-    var supportedCryptos = [
-        "BTC",
-        "ETH",
-        "BCH",
-        "BTG",
-        "DASH",
-        "XRP",
-        "ZEC",
-        "GHS"
-    ];
-    var supportedFiats = [
-        "USD",
-        "EUR",
-        "GBP"
-    ];
-
-    var supportedPairs = [];
-    for (var i = 0; i < supportedFiats.length; i++) {
-        for (var j = 0; j < supportedCryptos.length; j++) {
-            supportedPairs.push(supportedCryptos[j] + "-" + supportedFiats[i]);
+    const url = "https://cex.io/api/currency_limits";
+    var req = https.get(url, function(res) {
+        if (res.statusCode !== 200) {
+            Print("currency limits returned " + res.statusCode);
+            return;
         }
-    }
 
-    for (var i = 0; i < pairs.length; i++) {
-        if (supportedPairs.indexOf(pairs[i]) >= 0) {
-            mktData[pairs[i]] = {
-                asks: ordHash.Create(CompareFloats),
-                bids: ordHash.Create(CompareFloats)
-            };
-        }
-    }
+        res.setEncoding("utf8");
+        var data = "";
+        res.on("data", function(chunk) {
+            data += chunk;
+        });
+        res.on("end", function() {
+            try {
+                data = JSON.parse(data);
+            }
+            catch (err) {
+                Print("currency limits JSON parse error " + err);
+                return;
+            }
 
-    connection = CreateConnection();
-    callback();
+            if (data["ok"] !== "ok") {
+                Print("currency limits not ok");
+                return;
+            }
+
+            var pairs = data.data.pairs;
+            for (var i = 0; i < pairs.length; i++) {
+                if (pairs[i].symbol1 === "GHS" || pairs[i].symbol2 === "GHS") {
+                    // TODO unsupported for now
+                    continue;
+                }
+
+                var pair = pairs[i].symbol1 + "-" + pairs[i].symbol2;
+                mktData[pair] = {
+                    asks: ordHash.Create(CompareFloats),
+                    bids: ordHash.Create(CompareFloats)
+                };
+            }
+
+            connection = CreateConnection();
+            callback();
+        });
+    });
 }
 
 exports.Start = Start;

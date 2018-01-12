@@ -1,6 +1,6 @@
 const fs = require("fs");
+const https = require("https");
 const Pusher = require("pusher-js");
-
 
 const ordHash = require("./../ordered-hash");
 
@@ -145,38 +145,41 @@ function CompareFloatStrings(s1, s2)
     else            return 0;
 }
 
-function Start(pairs, callback)
+function Start(callback)
 {
-    var supportedCryptos = [
-        "BTC",
-        "XRP",
-        "LTC",
-        "ETH",
-        "BCH",
-    ];
-    var supportedFiats = [
-        "USD",
-        "EUR",
-    ];
-
-    var supportedPairs = [];
-    for (var i = 0; i < supportedFiats.length; i++) {
-        for (var j = 0; j < supportedCryptos.length; j++) {
-            supportedPairs.push(supportedCryptos[j] + "-" + supportedFiats[i]);
+    const url = "https://www.bitstamp.net/api/v2/trading-pairs-info/";
+    var req = https.get(url, function(res) {
+        if (res.statusCode !== 200) {
+            Print("pair info returned " + res.statusCode);
+            return;
         }
-    }
 
-    for (var i = 0; i < pairs.length; i++) {
-        if (supportedPairs.indexOf(pairs[i]) >= 0) {
-            mktData[pairs[i]] = {
-                asks: ordHash.Create(CompareFloatStrings),
-                bids: ordHash.Create(CompareFloatStrings)
-            };
-        }
-    }
+        res.setEncoding("utf8");
+        var data = "";
+        res.on("data", function(chunk) {
+            data += chunk;
+        });
+        res.on("end", function() {
+            try {
+                data = JSON.parse(data);
+            }
+            catch (err) {
+                Print("pair info JSON parse error " + err);
+                return;
+            }
 
-    connection = CreateConnection();
-    callback();
+            for (var i = 0; i < data.length; i++) {
+                var pair = data[i].name.replace("/", "-");
+                mktData[pair] = {
+                    asks: ordHash.Create(CompareFloatStrings),
+                    bids: ordHash.Create(CompareFloatStrings)
+                };
+            }
+
+            connection = CreateConnection();
+            callback();
+        });
+    });
 }
 
 exports.Start = Start;

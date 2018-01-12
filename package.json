@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "dependencies": {
+    "autobahn": "^17.5.2",
     "express": "^4.16.2",
     "pusher-js": "^4.2.1",
     "ws": "^3.3.3"

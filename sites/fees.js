@@ -89,6 +89,15 @@ const fees = {
         taker: [0.20 / 100.0, 0.0],
         maker: [0.20 / 100.0, 0.0]
     },
+    "Poloniex": {
+        // TODO deposit/withdrawal fees...
+        deposit: {
+        },
+        withdrawal: {
+        },
+        taker: [0.25 / 100.0, 0.0],
+        maker: [0.15 / 100.0, 0.0]
+    },
 
     // In process...
     "QUOINEX": {
@@ -97,8 +106,22 @@ const fees = {
             default: [0.0, 0.00]
         },
         withdraw: {
-            "USD": [0.0, 5.00]
-        }
+            "JPY": [0.0, 500.00],
+            "USD": [0.0, 5.00],
+            "SGD": [0.0, 5.00],
+            "EUR": [0.0, 5.00],
+            "AUD": [0.0, 5.00],
+            "HKD": [0.0, 40.00],
+            "INR": [0.0, 325.00],
+            "IDR": [0.01 / 100.0, 0.00], // Minimum 25k flat
+            "PHP": [0.0, 225.00],
+
+            // No withdrawal fees either?!
+            default: [0.0, 0.00]
+        },
+        // Actually 0.1% for ETH pairs
+        taker: [0.25 / 100.0, 0.0],
+        maker: [0.25 / 100.0, 0.0]
     }
 }
 
