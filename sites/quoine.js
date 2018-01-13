@@ -93,7 +93,7 @@ function StartDataPoll()
         nextPair = (nextPair + 1) % pairs.length;
         
         const url = host + "/products/" + quoineID + "/price_levels?full=1";
-        var req = https.get(url, function(res) {
+        https.get(url, function(res) {
             if (res.statusCode !== 200) {
                 if (res.statusCode === 429) {
                     Print("rate limit exceeded");
@@ -138,7 +138,7 @@ function CompareFloatStrings(s1, s2)
 function Start(callback)
 {
     const url = host + "/products";
-    var req = https.get(url, function(res) {
+    https.get(url, function(res) {
         if (res.statusCode !== 200) {
             if (res.statusCode === 429) {
                 Print("rate limit exceeded");

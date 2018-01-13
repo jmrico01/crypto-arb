@@ -5,27 +5,18 @@ const WebSocket = require("ws");
 
 const ordHash = require("./../ordered-hash");
 
+const user = "up114824136";
 const key = "cHZ8E9ieHTwLcdCeXjMy7JZ20wo";
 const secret = fs.readFileSync("keys/cex", "utf8").trim();
 
 const host = "wss://ws.cex.io/ws";
-
-var sendCount = 0;
-var startTime = Date.now() * 1000.0;
 
 function Print(msg)
 {
     console.log("(CEX) " + msg);
 }
 
-var mktData = {
-    // Example entry
-    // 
-    // "BTC-USD": {
-    //     asks: ordHash.Create(...),
-    //     bids: ordHash.Create(...)
-    // }
-};
+var mktData = {};
 
 var connection = null;
 
@@ -51,18 +42,29 @@ function CreateConnection()
 {
     var ws = null;
 
+    var RATE_LIMIT_MIN_TIME = 1; // secs
+
     var checkConnInterval = null;
-    var CHECK_CONN_TIME = 5; // secs
+    var CHECK_CONN_TIME = 10; // secs
     var lastTickerOID = null;
+    var lastMarketUpdate = {};
+    var MARKET_UPDATE_ELAPSED_WARN = 30; // secs
 
-    var REBUILD_ORDER_BOOK_TIME = 20; // secs
+    // How often an order book is rebuilt
+    // It takes (REBUILD_ORDER_BOOK_TIME * numPairs)
+    // for one order book to be rebuilt
+    var REBUILD_ORDER_BOOK_TIME = 5; // secs
     var rebuildOrderBookInterval = null;
+    var nextPair = 0;
 
-    var RECEIVED_IDS_MAX = 4;
+    var RECEIVED_IDS_MAX = 5;
     var receivedIDs = {};
     for (var pair in mktData) {
         receivedIDs[pair] = [];
     }
+
+    // General list of timeouts to clear on close
+    var timeouts = [];
 
     function ClearData(pair)
     {
@@ -83,35 +85,18 @@ function CreateConnection()
     function WebSocketSend(data)
     {
         if (ws !== null && ws.readyState === WebSocket.OPEN) {
-            sendCount = sendCount + 1;
-            var sendRate = sendCount / (Date.now() * 1000.0 - startTime);
-            if (sendRate > 1.0) {
-                Print("WARNING: rate limit above 1 per sec");
-            }
             ws.send(JSON.stringify(data));
         } 
-    }
-
-    function CheckConnection()
-    {
-        if (lastTickerOID !== null) {
-            Print("server didn't respond ticker, closing");
-            Close();
-            return;
-        }
-
-        lastTickerOID = "check_conn_" + Date.now().toString();
-        var ticker = {
-            e: "ticker",
-            data: [ "BTC", "USD" ],
-            oid: lastTickerOID
-        }
-        WebSocketSend(ticker);
     }
 
     function Close()
     {
         Print("call to Close()");
+
+        for (var i = 0; i < timeouts.length; i++) {
+            clearTimeout(timeouts[i]);
+        }
+        timeouts.clear();
 
         if (ws !== null) {
             ws.on("message", function() {});
@@ -133,33 +118,6 @@ function CreateConnection()
 
         ClearData();
     }
-    
-    function RequestRebuild(pair)
-    {
-        //Print((new Date(Date.now())).toTimeString() + ": Request rebuild for " + pair);
-        if (pair === undefined || pair === null) {
-            for (var p in mktData) {
-                var unsub = {
-                    e: "order-book-unsubscribe",
-                    data: {
-                        pair: p.split("-")
-                    },
-                    oid: "0"
-                };
-                WebSocketSend(unsub);
-            }
-        }
-        else {
-            var unsub = {
-                e: "order-book-unsubscribe",
-                data: {
-                    pair: pair.split("-")
-                },
-                oid: "0"
-            };
-            WebSocketSend(unsub);
-        }
-    }
 
     function AddMarketData(data)
     {
@@ -173,10 +131,8 @@ function CreateConnection()
         }
         if (receivedIDs[pair].length === RECEIVED_IDS_MAX) {
             if (receivedIDs[pair][1] - receivedIDs[pair][0] !== 1) {
-                // TODO untested
                 Print("missed market data frame for " + pair + ", rebuilding");
-                RequestRebuild(pair);
-                //Close();
+                Rebuild(pair);
             }
         }
     
@@ -213,6 +169,20 @@ function CreateConnection()
                 mktData[pair].bids.insert(price, [volume, time]);
             }
         }
+
+        lastMarketUpdate[pair] = Date.now();
+    }
+
+    function Rebuild(pair)
+    {
+        var orderBookUnsub = {
+            "e": "order-book-unsubscribe",
+            "data": {
+                "pair": pair.split("-")
+            },
+            "oid": "0"
+        };
+        WebSocketSend(orderBookUnsub);
     }
     
     function HandleOrderBookSubscribe(msg)
@@ -229,6 +199,8 @@ function CreateConnection()
             }
         }
     
+        var pair = msg.data.pair.replace(":", "-");
+        ClearData(pair);
         // NOTE: for some reason, this first msg sends time in seconds
         msg.data.time = msg.data.timestamp * 1000;
         AddMarketData(msg.data);
@@ -236,19 +208,12 @@ function CreateConnection()
     
     function HandleOrderBookUnsubscribe(msg)
     {
-        // TODO handle this reset more gracefully.
-        // Don't clear the data out & rewrite, but instead
-        // wait to receive it and then edit our version to match
-        // the server's.
         if (msg.hasOwnProperty("ok")) {
             if (msg.ok !== "ok") {
                 Print("order book unsubscribe not OK");
                 return;
             }
         }
-        
-        //Print((new Date(Date.now())).toTimeString() + ": Cleared order book for " + msg.data.pair);
-        ClearData(msg.data.pair.replace(":", "-"));
     
         //Print((new Date(Date.now())).toTimeString() + ": Resubscribing for " + msg.data.pair);
         var orderBookSub = {
@@ -292,27 +257,70 @@ function CreateConnection()
             Close();
         }
     }
-    
-    function OnAuthenticated()
+
+    function CheckConnection()
     {
-        for (var pair in mktData) {
+        if (lastTickerOID !== null) {
+            Print("server didn't respond ticker, closing");
+            Close();
+            return;
+        }
+
+        lastTickerOID = "check_conn_" + Date.now().toString();
+        var ticker = {
+            e: "ticker",
+            data: [ "BTC", "USD" ],
+            oid: lastTickerOID
+        }
+        WebSocketSend(ticker);
+
+        var now = Date.now();
+        for (var pair in lastMarketUpdate) {
+            var elapsed = now - lastMarketUpdate[pair];
+            if (elapsed > MARKET_UPDATE_ELAPSED_WARN * 1000.0) {
+                //Print("Warning: no updates in last "
+                //    + MARKET_UPDATE_ELAPSED_WARN + "secs for " + pair);
+            }
+        }
+    }
+    
+    function SchedulePairSubscription(pairs, i)
+    {
+        timeouts.push(setTimeout(function() {
+            //Print("subscribing to " + pairs[i]);
             var orderBookSub = {
                 "e": "order-book-subscribe",
                 "data": {
-                    "pair": pair.split("-"),
+                    "pair": pairs[i].split("-"),
                     "subscribe": true,
                     "depth": 0
                 },
                 "oid": "0"
             };
             WebSocketSend(orderBookSub);
+        }, i * RATE_LIMIT_MIN_TIME * 1000));
+    }
+    
+    function OnAuthenticated()
+    {
+        var pairs = Object.keys(mktData);
+
+        for (var i = 0; i < pairs.length; i++) {
+            SchedulePairSubscription(pairs, i);
         }
     
-        checkConnInterval = setInterval(CheckConnection, CHECK_CONN_TIME * 1000);
+        checkConnInterval = setInterval(
+            CheckConnection, CHECK_CONN_TIME * 1000);
 
-        rebuildOrderBookInterval = setInterval(function() {
-            RequestRebuild(null);
-        }, REBUILD_ORDER_BOOK_TIME * 1000);
+        timeouts.push(setTimeout(function() {
+            //Print("scheduling rebuilds");
+            rebuildOrderBookInterval = setInterval(function() {
+                var pair = pairs[nextPair];
+                //Print("Rebuilding " + pair);
+                nextPair = (nextPair + 1) % pairs.length;
+                Rebuild(pair);
+            }, REBUILD_ORDER_BOOK_TIME * 1000);
+        }, pairs.length * RATE_LIMIT_MIN_TIME * 1000));
     }
     
     function OnIncoming(msg)
@@ -360,8 +368,6 @@ function CreateConnection()
         else if (msg.e === "disconnecting") {
             Print("served disconnected (" + msg.reason + ")");
             Close();
-            //CloseConnection();
-            //CreateConnection();
         }
         else if (MsgIsRateLimit(msg)) {
             Print("rate limit exceeded");
@@ -401,7 +407,7 @@ function CreateConnection()
         Print(reason);
         if (serverDown) {
             Print("server is down, restart crypto-arb app");
-            mktData = {};
+            ClearData();
             return;
         }
 
@@ -421,7 +427,7 @@ function CompareFloats(f1, f2)
 function Start(callback)
 {
     const url = "https://cex.io/api/currency_limits";
-    var req = https.get(url, function(res) {
+    https.get(url, function(res) {
         if (res.statusCode !== 200) {
             Print("currency limits returned " + res.statusCode);
             return;
@@ -468,3 +474,141 @@ function Start(callback)
 
 exports.Start = Start;
 exports.data = mktData;
+
+// private functions
+
+function GenerateIncreasingNonce()
+{
+    // Set the nonce to the number of milliseconds
+    // that have passed since the reference date below.
+    // This will always increase if called at > 1ms intervals.
+    var refDate = new Date("December 20, 2017");
+    var nonce = Math.floor(Date.now() - refDate.getTime());
+
+    return nonce;
+}
+
+function CreateSignature(apiKey, apiSecret)
+{
+    var nonce = GenerateIncreasingNonce();
+    var signatureHash = crypto.createHmac("sha256", apiSecret);
+    signatureHash.update(nonce.toString() + user + apiKey, "utf8");
+
+    return {
+        key: apiKey,
+        signature: signatureHash.digest("hex"),
+        nonce: nonce
+    };
+}
+
+function HandleResponse(res, callback)
+{
+    if (res.statusCode !== 200) {
+        Print("request status code: " + res.statusCode);
+        return;
+    }
+
+    res.setEncoding("utf8");
+    var data = "";
+    res.on("data", function(chunk) {
+        data += chunk;
+    });
+    res.on("end", function() {
+        try {
+            data = JSON.parse(data);
+        }
+        catch (err) {
+            Print("JSON parse error: " + err);
+            Print(data);
+            return;
+        }
+        callback(data);
+    });
+}
+
+function SubmitPrivateRequest(type, data, callback)
+{
+    var postData = CreateSignature(key, secret);
+    for (var k in data) {
+        postData[k] = data[k];
+    }
+
+    var options = {
+        hostname: "cex.io",
+        port: 443,
+        path: "/api/" + type + "/",
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        }
+    };
+
+    var req = https.request(options, function(res) {
+        HandleResponse(res, callback);
+    });
+    req.on("error", function(err) {
+        Print("Request error: " + err.message);
+    });
+    req.end(JSON.stringify(postData), "utf8");
+}
+
+function GetBalance(callback)
+{
+    SubmitPrivateRequest("balance", {}, function(data) {
+        var balance = {};
+        for (var currency in data) {
+            if (currency === "timestamp" || currency === "username") {
+                continue;
+            }
+            balance[currency] = data[currency].available;
+        }
+
+        callback(balance);
+    });
+}
+
+function PlaceOrder(pair, type, amount, price, callback)
+{
+    /**
+     * example:
+     *     pair: XRP-USD
+     *     type: buy
+     *     amount: 100.00
+     *     price: 2.00
+     * 
+     * You're requesting to buy 100.00 XRP, at a price of 2.00 USD per XRP.
+     *    e.g. 200.00 USD => 100.00 XRP (minus fees)
+     */
+
+    if (typeof(pair) !== "string") {
+        Print("pair not a string: " + pair);
+        return;
+    }
+    if (typeof(type) !== "string" || (type !== "buy" && type !== "sell")) {
+        Print("invalid type: " + type);
+        return;
+    }
+    if (Number.isNaN(amount)) {
+        Print("amount not a number: " + amount);
+        return;
+    }
+    if (Number.isNaN(price)) {
+        Print("price not a number: " + price);
+        return;
+    }
+    if (!mktData.hasOwnProperty(pair)) {
+        Print("place order attempted on unsupported pair: " + pair);
+        return;
+    }
+    var pairReq = pair.split("-").join("/");
+    SubmitPrivateRequest("place_order/" + pairReq, {
+        type: type,
+        amount: amount,
+        price: price
+    }, function(data) {
+        callback(data);
+    });
+}
+
+exports.GetBalance = GetBalance;
+exports.PlaceOrder = PlaceOrder;

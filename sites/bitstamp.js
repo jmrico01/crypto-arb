@@ -15,14 +15,7 @@ function Print(msg)
     console.log("(BITSTAMP) " + msg);
 }
 
-var mktData = {
-    // Example entry
-    // 
-    // "BTC-USD": {
-    //     asks: ordHash.Create(...),
-    //     bids: ordHash.Create(...)
-    // }
-};
+var mktData = {};
 
 var connection = null;
 
@@ -148,7 +141,7 @@ function CompareFloatStrings(s1, s2)
 function Start(callback)
 {
     const url = "https://www.bitstamp.net/api/v2/trading-pairs-info/";
-    var req = https.get(url, function(res) {
+    https.get(url, function(res) {
         if (res.statusCode !== 200) {
             Print("pair info returned " + res.statusCode);
             return;

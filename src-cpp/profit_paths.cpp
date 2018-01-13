@@ -502,8 +502,8 @@ int main(int argc, char* argv[])
         }
     }*/
 
-    printf("starting path computations\n");
-    fflush(stdout);
+    //printf("starting path computations\n");
+    //fflush(stdout);
 
     //Time(0);
     std::vector<Path> profitPaths;
@@ -514,8 +514,8 @@ int main(int argc, char* argv[])
     Time(0);
     std::vector<Path> profitCycles;
     FindProfitCycles(numNodes, (const Link**)links, profitCycles);
-    printf("  cycles time: %f\n", Time(0));
-    fflush(stdout);
+    //printf("  cycles time: %f\n", Time(0));
+    //fflush(stdout);
 
     // Write profit paths
     FILE* outFile = fopen(argv[2], "w");

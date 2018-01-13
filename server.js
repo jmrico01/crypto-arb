@@ -34,7 +34,7 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: false,
+        enabled: false, // site down for now
         module: kraken,
         entryParser: function(entry) {
             return entry;

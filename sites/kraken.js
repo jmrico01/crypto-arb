@@ -14,14 +14,7 @@ function Print(msg)
     console.log("(KRAKEN) " + msg);
 }
 
-var mktData = {
-    // Example entry
-    // 
-    // "BTC-USD": {
-    //     asks: ordHash.Create(...),
-    //     bids: ordHash.Create(...)
-    // }
-};
+var mktData = {};
 
 var pollTickerInterval = null;
 var POLL_TICKER_TIME = 0.2; // seconds
@@ -175,7 +168,7 @@ function SubmitPublicRequest(type, args, callback)
     };
 
     //Print("Submitting request: " + type);
-    var req = https.get(options, function(res) {
+    https.get(options, function(res) {
         HandleResponse(res, callback);
     });
 

@@ -1,5 +1,5 @@
 const UPDATE_TIME = 0.2;
-const WRITE_TIME = 1.0;
+const MIN_WRITE_TIME = 0.5;
 const PROFIT_PATHS_PROGRAM = "build/profit_paths";
 const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
@@ -17,7 +17,7 @@ var sites = {};
 var nodes = {};
 var links = {};
 
-var profitCycles = {};
+var profitCycles = [];
 
 function IsFiat(currency)
 {
@@ -68,25 +68,24 @@ function GetExchangeRate(site, curr1, curr2)
 function GetMaxProfitPaths(type, k, order, invest)
 {
     var paths = [];
-    var pathsFile;
 
     if (type === "paths") {
-        pathsFile = PROFIT_PATHS_FILE;
+        return [];
     }
     else if (type === "cycles") {
-        pathsFile = PROFIT_CYCLES_FILE;
+        paths = profitCycles;
     }
     else {
         console.assert(false, "Wrong path request type");
         return [];
     }
 
-    try {
+    /*try {
         paths = JSON.parse(fs.readFileSync(pathsFile));
     }
     catch (err) {
         return [];
-    }
+    }*/
 
     if (order === "invest") {
         paths.sort(function(path1, path2) {
@@ -101,13 +100,14 @@ function GetMaxProfitPaths(type, k, order, invest)
 
     k = Math.min(k, paths.length);
     return paths.slice(0, k);
+    return [];
 }
 
 function CalcPathProfit(path)
 {
     var profit = [1.0, 0.00, 0.0];
-    for (var i = 1; i < cycle.length; i++) {
-        var link = links[cycle[i-1]][cycle[i]];
+    for (var i = 1; i < path.length; i++) {
+        var link = links[path[i-1]][path[i]];
         profit[0] *= link[0];
         profit[1] = profit[1] * link[0] + link[1];
         profit[2] += link[2];
@@ -133,10 +133,14 @@ function AnalyzeProfitCycles()
     for (var i = 0; i < profitCycles.length; i++) {
         if (profitCycles[i][0][2] === 0.0) {
             var profit = CalcCycleProfit(profitCycles[i][1]);
-            console.log("INSTANT PROFIT! (supposedly)");
-            if (profit[2] === 0.0) {
+            //console.log("INSTANT PROFIT! (supposedly)");
+            if (profit[0] > 1.0 && profit[2] === 0.0) {
+                var string = "INSTANT PROFIT!\n";
+                string += profit.toString();
+                string += profitCycles[i][1].toString();
+                fs.appendFile("cycle-log", string);
+                
                 console.log("INSTANT PROFIT!");
-                console.log(profitCycles[i][0]);
                 console.log(profit);
                 console.log(profitCycles[i][1]);
             }
@@ -374,50 +378,81 @@ function Start(sitesIn)
     console.log("  links: " + nLinks);
 
     setInterval(UpdateExchangeLinks, UPDATE_TIME * 1000);
-    setInterval(function() {
-        WriteProfitGraph(PROFIT_GRAPH_FILE, function(err) {
-            if (err) {
-                console.log("Error writing profit graph");
-                console.log(err);
-                return;
+
+    var lastWritten = Date.now();
+    function WriteGraphCallback(err)
+    {
+        if (err) {
+            console.log("Error writing profit graph");
+            console.log(err);
+            return;
+        }
+
+        //console.log("cpp");
+        const profitPathsProc = childProcess.spawn(
+            PROFIT_PATHS_PROGRAM,
+            [
+                PROFIT_GRAPH_FILE,
+                PROFIT_PATHS_FILE,
+                PROFIT_CYCLES_FILE
+            ]
+        );
+        profitPathsProc.stdout.on("data", function(data) {
+            process.stdout.write(data.toString());
+        });
+        profitPathsProc.stderr.on("data", function(data) {
+            console.log(data.toString());
+        });
+        profitPathsProc.on("close", function(code) {
+            //console.log("  cpp done");
+            if (code !== 0) {
+                console.log("profit paths process exited with code " + code);
             }
 
-            const profitPathsProc = childProcess.spawn(
-                PROFIT_PATHS_PROGRAM,
-                [
-                    PROFIT_GRAPH_FILE,
-                    PROFIT_PATHS_FILE,
-                    PROFIT_CYCLES_FILE
-                ]
-            );
-            profitPathsProc.stdout.on("data", function(data) {
-                process.stdout.write(data.toString());
-            });
-            profitPathsProc.stderr.on("data", function(data) {
-                console.log(data.toString());
-            });
-            profitPathsProc.on("close", function(code) {
-                if (code !== 0) {
-                    console.log("profit paths process exited with code " + code);
+            fs.readFile(PROFIT_CYCLES_FILE, function(err, data) {
+                if (err) {
+                    console.log("Error reading profit cycles file: " + err);
                 }
 
-                fs.readFile(PROFIT_CYCLES_FILE, function(err, data) {
-                    if (err) {
-                        console.log("Error reading profit cycles file: " + err);
-                    }
+                try {
+                    profitCycles = JSON.parse(data);
+                }
+                catch (err) {
+                    console.log("Error parsing profit cycles: " + err);
+                    return;
+                }
 
-                    try {
-                        profitCycles = JSON.parse(data);
-                    }
-                    catch (err) {
-                        return;
-                    }
-
-                    AnalyzeProfitCycles();
-                });
-            })
+                AnalyzeProfitCycles();
+                var elapsed = Date.now() - lastWritten;
+                lastWritten = Date.now();
+                var wait = 0;
+                if (elapsed < MIN_WRITE_TIME * 1000.0) {
+                    wait = MIN_WRITE_TIME * 1000.0 - elapsed;
+                }
+                //console.log("elapsed: " + elapsed);
+                //console.log("wait: " + wait);
+                setTimeout(function() {
+                    //console.log("write graph");
+                    WriteProfitGraph(PROFIT_GRAPH_FILE, WriteGraphCallback);
+                }, wait);
+            });
         });
-    }, WRITE_TIME * 1000);
+    }
+
+    WriteProfitGraph(PROFIT_GRAPH_FILE, WriteGraphCallback);
+
+    /*sites["CEX"].module.GetBalance(function(data) {
+        var usdBalance = Math.floor(parseFloat(data["USD"]));
+        var xrpPrice = 2.20;
+        console.log(usdBalance);
+        console.log(xrpPrice);
+        console.log(usdBalance / xrpPrice);
+        sites["CEX"].module.PlaceOrder("XRP-USD", "buy",
+            usdBalance / xrpPrice, xrpPrice, function(data) {
+                console.log(data);
+            }
+        );
+    });*/
 }
 
 exports.Start = Start;

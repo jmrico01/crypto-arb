@@ -79,7 +79,7 @@ function CompareFloatStrings(s1, s2)
 function Start(callback)
 {
     const url = "https://poloniex.com/public?command=returnTicker";
-    var req = https.get(url, function(res) {
+    https.get(url, function(res) {
         if (res.statusCode !== 200) {
             Print("ticker request returned " + res.statusCode);
             return;
