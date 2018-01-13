@@ -138,8 +138,8 @@ function AnalyzeProfitCycles()
                 var string = "INSTANT PROFIT!\n";
                 string += profit.toString();
                 string += profitCycles[i][1].toString();
-                fs.appendFile("cycle-log", string);
-                
+                fs.appendFile("cycle-log", string, function() {});
+
                 console.log("INSTANT PROFIT!");
                 console.log(profit);
                 console.log(profitCycles[i][1]);
