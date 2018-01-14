@@ -11,6 +11,7 @@ function GetTimestamp()
 {
     var date = new Date(Date.now());
     return date.toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
         year: "2-digit",
         month: "2-digit",
         day: "2-digit",
