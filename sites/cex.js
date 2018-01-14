@@ -42,7 +42,8 @@ function CreateConnection()
 {
     var ws = null;
 
-    var RATE_LIMIT_MIN_TIME = 1; // secs
+    // TODO I changed this!
+    var RATE_LIMIT_MIN_TIME = 0.05; // secs
 
     var checkConnInterval = null;
     var CHECK_CONN_TIME = 10; // secs
@@ -385,8 +386,8 @@ function CreateConnection()
             AddMarketData(msg.data);
         }
         else {
-            Print("unhandled message:");
-            Print(msg);
+            //Print("unhandled message:");
+            //console.log(msg);
         }
     }
 
@@ -475,7 +476,7 @@ function Start(callback)
 exports.Start = Start;
 exports.data = mktData;
 
-// private functions
+// ==================== REST API ====================
 
 function GenerateIncreasingNonce()
 {
@@ -501,6 +502,16 @@ function CreateSignature(apiKey, apiSecret)
     };
 }
 
+function ArgsToQueryString(args)
+{
+    var str = "?";
+    for (var key in args) {
+        str += key + "=" + args[key] + "&";
+    }
+
+    return str.slice(0, -1);
+}
+
 function HandleResponse(res, callback)
 {
     if (res.statusCode !== 200) {
@@ -524,6 +535,38 @@ function HandleResponse(res, callback)
         }
         callback(data);
     });
+}
+
+function SubmitPublicRequest(type, args, callback)
+{
+    var options = {
+        hostname: "cex.io",
+        port: 443,
+        path: "/api/" + type + "/" + ArgsToQueryString(args),
+        method: "GET"
+    };
+
+    var req = https.request(options, function(res) {
+        HandleResponse(res, callback);
+    });
+    req.on("error", function(err) {
+        Print("Request error: " + err.message);
+    });
+    req.end();
+}
+
+function GetPrices(pair, callback)
+{
+    SubmitPublicRequest("order_book/" + pair[0] + "/" + pair[1],
+        { depth: 5 }, function(data) {
+            var prices = {
+                asks: data.asks,
+                bids: data.bids
+            };
+
+            callback(prices);
+        }
+    );
 }
 
 function SubmitPrivateRequest(type, data, callback)
@@ -567,25 +610,30 @@ function GetBalance(callback)
     });
 }
 
-function PlaceOrder(pair, type, amount, price, callback)
+function PlaceOrder(pair, action, price, amount, callback)
 {
     /**
      * example:
-     *     pair: XRP-USD
-     *     type: buy
-     *     amount: 100.00
+     *     pair: "XRP-USD"
+     *     type: "buy"
      *     price: 2.00
+     *     amount: 100.00
      * 
      * You're requesting to buy 100.00 XRP, at a price of 2.00 USD per XRP.
      *    e.g. 200.00 USD => 100.00 XRP (minus fees)
      */
 
-    if (typeof(pair) !== "string") {
-        Print("pair not a string: " + pair);
+    if (!Array.isArray(pair)) {
+        Print("pair not an array: " + pair);
         return;
     }
-    if (typeof(type) !== "string" || (type !== "buy" && type !== "sell")) {
-        Print("invalid type: " + type);
+    if (!mktData.hasOwnProperty(pair.join("-"))) {
+        Print("place order attempted on unsupported pair: " + pair.join("-"));
+        return;
+    }
+    if (typeof(action) !== "string"
+    || (action !== "buy" && action !== "sell")) {
+        Print("invalid action: " + action);
         return;
     }
     if (Number.isNaN(amount)) {
@@ -596,19 +644,52 @@ function PlaceOrder(pair, type, amount, price, callback)
         Print("price not a number: " + price);
         return;
     }
-    if (!mktData.hasOwnProperty(pair)) {
-        Print("place order attempted on unsupported pair: " + pair);
-        return;
-    }
-    var pairReq = pair.split("-").join("/");
+
+    var pairReq = pair.join("/");
     SubmitPrivateRequest("place_order/" + pairReq, {
-        type: type,
+        type: action,
         amount: amount,
         price: price
     }, function(data) {
-        callback(data);
+        if (data.hasOwnProperty("error")) {
+            callback(null, null, data.error);
+            return;
+        }
+
+        if (data.complete) {
+            callback(data.price, data.amount, null);
+            return;
+        }
+
+        var checks = 0;
+        var id = data.id;
+        var checkInt = setInterval(function() {
+            SubmitPrivateRequest("get_order", { id: id }, function(data) {
+                checks++;
+                if (!data.hasOwnProperty("remains")) {
+                    clearInterval(checkInt);
+                    callback(data.price, data.amount, null);
+                    return;
+                }
+
+                Print("order waiting for completion");
+            });
+
+            if (checks >= 6) {
+                clearInterval(checkInt);
+                SubmitPrivateRequest("cancel_order", { id: id },
+                    function(data) {
+                        if (!data) {
+                            console.log("WARNING: Failed to cancel order");
+                        }
+                    }
+                );
+                callback(null, null, "Order timed out, cancelled");
+            }
+        }, 500);
     });
 }
 
+exports.GetPrices = GetPrices;
 exports.GetBalance = GetBalance;
 exports.PlaceOrder = PlaceOrder;

@@ -5,6 +5,7 @@ const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
 const PROFIT_CYCLES_FILE = "temp/profit-cycles.json";
 
+const logger = require("./logger");
 const fs = require("fs");
 const childProcess = require("child_process");
 const fees = require("./sites/fees");
@@ -21,14 +22,24 @@ var profitCycles = [];
 
 function IsFiat(currency)
 {
-    var fiats = [
-        "USD",
-        "EUR",
-        "GBP",
-        "CAD"
-    ];
+    // From server.js
+    var currencies = {
+        "USD": { name: "US Dollar" },
+        "CAD": { name: "Canadian Dollar" },
+        "EUR": { name: "Euro" },
+        "GBP": { name: "British Pound" },
+        "RUB": { name: "Russian Ruble" },
+        "INR": { name: "Indian Rupee" },
+        "CNY": { name: "Chinese Yuan" },
+        "JPY": { name: "Japanese Yen" },
+        "HKD": { name: "Hong Kong Dollar" },
+        "PHP": { name: "Philippine Piso" },
+        "SGD": { name: "Singapore Dollar" },
+        "IDR": { name: "Indonesian Rupiah" },
+        "AUD": { name: "Australian Dollar" }
+    };
 
-    return fiats.indexOf(currency) !== -1;
+    return currencies.hasOwnProperty(currency);
 }
 
 // Returns a boolean value indicating whether the given site
@@ -52,17 +63,96 @@ function CurrenciesToPair(site, curr1, curr2)
     return pair;
 }
 
-function GetExchangeRate(site, curr1, curr2)
+function GetExchangeRate(site, curr1, curr2, depth = 0)
 {
     var pair = curr1 + "-" + curr2;
     if (sites[site].module.data.hasOwnProperty(pair)) {
         var lenBids = sites[site].module.data[pair].bids.length();
-        return sites[site].module.data[pair].bids.entryByIndex(lenBids - 1)[0];
+        return sites[site].module.data[pair].bids
+            .entryByIndex(lenBids - 1 - depth)[0];
     }
     else {
         pair = curr2 + "-" + curr1;
-        return 1.0 / sites[site].module.data[pair].asks.entryByIndex(0)[0];
+        return 1.0 / sites[site].module.data[pair].asks.entryByIndex(depth)[0];
     }
+}
+
+// Taking into account the entire market depth, how much
+// of curr2 will I get if I put in "invest" amount of curr1?
+function GetTradeAmount(site, curr1, curr2, invest)
+{
+    /*console.log("GetTradeAmount, site " + site + ", "
+        + curr1 + "-" + curr2 + ", invest " + invest);*/
+    var pair = curr1 + "-" + curr2;
+    var isBid;
+    var startIdx;
+    if (sites[site].module.data.hasOwnProperty(pair)) {
+        isBid = true;
+        startIdx = sites[site].module.data[pair].bids.length() - 1;
+    }
+    else {
+        pair = curr2 + "-" + curr1;
+        isBid = false;
+        startIdx = 0;
+    }
+
+    var output = 0.0;
+    var depth = 0;
+    while (true) {
+        //console.log("depth " + depth);
+        var exchangeRate = GetExchangeRate(site, curr1, curr2, depth);
+        var feeExchange = fees.Exchange(site, curr1, curr2);
+        var link = [
+            exchangeRate * (1.0 - feeExchange[0]),
+            feeExchange[1],
+            0.0
+        ];
+        //console.log("link: " + link);
+
+        // Amount of first currency in "pair" that is available to trade
+        // at the previous exchange rate / link rate
+        var available;
+        if (isBid) {
+            if (depth >= sites[site].module.data[pair].bids.length()) {
+                return null;
+            }
+            available = sites[site].module.data[pair].bids
+                .entryByIndex(startIdx - depth)[1][0];
+        }
+        else {
+            if (depth >= sites[site].module.data[pair].asks.length()) {
+                return null;
+            }
+            available = sites[site].module.data[pair].asks
+                .entryByIndex(startIdx + depth)[1][0];
+        }
+        //console.log("available: " + available);
+
+        // Get the amount for comparison with "invest"
+        var compare;
+        if (isBid) {
+            compare = available;
+        }
+        else {
+            compare = (available + link[1]) / link[0];
+        }
+
+        //console.log("compare: " + compare);
+        if (compare > invest) {
+            output += invest * link[0] - link[1];
+            //console.log("done!");
+            break;
+        }
+        else {
+            output += compare * link[0] - link[1];
+            invest -= compare;
+            //console.log("not done\ninvest: " + invest + ", output: " + output);
+        }
+
+        depth++;
+    }
+
+    return output;
 }
 
 function GetMaxProfitPaths(type, k, order, invest)
@@ -103,14 +193,20 @@ function GetMaxProfitPaths(type, k, order, invest)
     return [];
 }
 
+function AddProfits(p1, p2)
+{
+    return [
+        p1[0] * p2[0],
+        p1[1] * p2[0] + p2[1],
+        p1[2] + p2[2]
+    ]
+}
+
 function CalcPathProfit(path)
 {
     var profit = [1.0, 0.00, 0.0];
     for (var i = 1; i < path.length; i++) {
-        var link = links[path[i-1]][path[i]];
-        profit[0] *= link[0];
-        profit[1] = profit[1] * link[0] + link[1];
-        profit[2] += link[2];
+        profit = AddProfits(profit, links[path[i-1]][path[i]]);
     }
 
     return profit;
@@ -119,32 +215,287 @@ function CalcPathProfit(path)
 function CalcCycleProfit(cycle)
 {
     var profit = CalcPathProfit(cycle);
+    return AddProfits(profit, links[cycle[cycle.length-1]][cycle[0]]);
+}
 
-    var link = links[cycle[cycle.length-1]][cycle[0]];
-    profit[0] *= link[0];
-    profit[1] = profit[1] * link[0] + link[1];
-    profit[2] += link[2];
+function SimulateCycle(cycle, invest)
+{
+    var site = cycle[0].split("-")[0];
+    var output = invest;
+    for (var i = 0; i < cycle.length; i++) {
+        var curr1 = cycle[i].split("-")[1];
+        var curr2 = cycle[(i+1) % cycle.length].split("-")[1];
+        output = GetTradeAmount(site, curr1, curr2, output);
+        if (output === null) {
+            console.log("WARNING: simulation failed, possibly missing data");
+            return null;
+        }
+    }
 
-    return profit;
+    return output;
+}
+
+// TODO ?!@?!?
+var balance = {
+    // this gets updated at start
+};
+const USD_INVEST = 30.00;
+
+function TrimFloat(float, characters)
+{
+    var str = float.toString();
+    var chars = Math.min(characters, str.length);
+    return parseFloat(str.substring(0, chars));
+}
+
+// WARNING dangerous function, can execute trades!
+function Trade(site, curr1, curr2, curr1Amount, callback)
+{
+    var pair = [curr1, curr2];
+    var action = "sell";
+    if (!sites[site].module.data.hasOwnProperty(curr1 + "-" + curr2)) {
+        pair = [curr2, curr1];
+        action = "buy";
+    }
+    var exchangeFee = fees.Exchange(site, curr1, curr2);
+
+    sites[site].module.GetPrices(pair, function(prices) {
+        var relevantPrices = prices.bids;
+        if (action === "buy") {
+            relevantPrices = prices.asks;
+        }
+
+        var price = relevantPrices[0][0];
+        var amount = curr1Amount;
+        if (action === "buy") {
+            amount = curr1Amount / price / (1.0 + exchangeFee[0]);
+            amount = TrimFloat(amount, 8);
+        }
+
+        //console.log(prices);
+        console.log("-> " + action + " " + amount + " "
+            + pair[0] + "-" + pair[1] + " for " + price);
+
+        // TEST
+        /*var newBalance = JSON.parse(JSON.stringify(balance[site]));
+        if (action === "buy") {
+            newBalance[curr1] = parseFloat(newBalance[curr1])
+                - amount * price * (1.0 - exchangeFee[0]);
+            newBalance[curr2] = parseFloat(newBalance[curr2]) + amount;
+        }
+        else {
+            newBalance[curr1] = parseFloat(newBalance[curr1]) - amount;
+            newBalance[curr2] = parseFloat(newBalance[curr2])
+                + amount * price;
+        }
+        var curr2Delta = parseFloat(newBalance[curr2])
+            - parseFloat(balance[site][curr2]);
+        balance[site] = newBalance
+        console.log(balance[site]);
+        console.log("made " + curr2Delta + " " + curr2);
+        callback(curr2Delta);*/
+        /*sites[site].module.PlaceOrder(pair, action, price, amount,
+            function(price, amount, err) {
+                if (err) {
+                    console.log(err);
+                    return;
+                }
+
+                console.log("Order executed!!");
+                console.log(amount + " " + pair.toString() + " for " + price);
+                sites[site].module.GetBalance(function(newBalance) {
+                    var curr2Delta = parseFloat(newBalance[curr2])
+                        - parseFloat(balance[site][curr2]);
+                    balance[site] = newBalance;
+                    console.log("made " + curr2Delta + " " + curr2);
+                    callback(curr2Delta);
+                });
+            }
+        );*/
+    });
+}
+
+function TradeCycleRecursive(site, cycle, invest, i, callback)
+{
+    if (i >= cycle.length) {
+        callback();
+        return;
+    }
+
+    Trade(site, cycle[i].split("-")[1],
+        cycle[(i+1) % cycle.length].split("-")[1], invest, function(output) {
+            TradeCycleRecursive(site, cycle, output, i + 1, callback);
+        }
+    );
+}
+
+function ShiftCycleToStartCurrency(cycle, currency)
+{
+    var start = -1;
+    for (var i = 0; i < cycle.length; i++) {
+        if (cycle[i].split("-")[1] === currency) {
+            start = i;
+            break;
+        }
+    }
+    if (start === -1) {
+        return null;
+    }
+
+    var shifted = [];
+    for (var i = 0; i < cycle.length; i++) {
+        var ind = (i + start) % cycle.length;
+        shifted.push(cycle[ind]);
+    }
+
+    return shifted;
+}
+
+function CalcTradeDepthBudget(site, curr1, curr2, depth)
+{
+    /*console.log("CalcTradeDepthBudget, site " + site + ", "
+        + curr1 + "-" + curr2 + ", depth " + depth);*/
+    var pair = curr1 + "-" + curr2;
+    var isBid;
+    var startIdx;
+    if (sites[site].module.data.hasOwnProperty(pair)) {
+        isBid = true;
+        startIdx = sites[site].module.data[pair].bids.length() - 1;
+    }
+    else {
+        pair = curr2 + "-" + curr1;
+        isBid = false;
+        startIdx = 0;
+    }
+
+    var mdEntry;
+    if (isBid) {
+        mdEntry = sites[site].module.data[pair].bids
+            .entryByIndex(startIdx - depth);
+    }
+    else {
+        mdEntry = sites[site].module.data[pair].asks
+            .entryByIndex(startIdx + depth);
+    }
+    //console.log("mdEntry: " + mdEntry);
+
+    var budget;
+    if (isBid) {
+        budget = mdEntry[1][0];
+    }
+    else {
+        budget = mdEntry[1][0] * mdEntry[0];
+    }
+
+    if (depth === 0) {
+        return budget;
+    }
+    else {
+        return budget + CalcTradeDepthBudget(site, curr1, curr2, depth - 1);
+    }
+}
+
+function CalcCycleDepthBudget(cycle, depth)
+{
+    var site = cycle[0].split("-")[0];
+    var link = [ 1.00, 0.00, 0.0 ];
+    var depthBudget = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < cycle.length; i++) {
+        var curr1 = cycle[i].split("-")[1];
+        var curr2 = cycle[(i+1) % cycle.length].split("-")[1];
+        var budget = CalcTradeDepthBudget(site, curr1, curr2, depth);
+        budget = (budget + link[1]) / link[0];
+        link = AddProfits(link, links[cycle[i]][cycle[(i+1) % cycle.length]]);
+        //console.log(curr1 + "-" + curr2 + " budget: " + budget);
+        if (budget < depthBudget) {
+            depthBudget = budget;
+        }
+    }
+
+    return depthBudget;
+}
+
+function HandleInstantCycles(cycles)
+{
+    for (var i = 0; i < cycles.length; i++) {
+        console.log("===> Cycle " + i);
+        console.log(cycles[i]);
+        var cycle = cycles[i];
+        var cycle = ShiftCycleToStartCurrency(cycles[i], "USD");
+        if (cycle === null) {
+            console.log("=> Instant cycle without USD");
+            continue;
+        }
+        console.log(cycle);
+    
+        console.log("=> Theoretical output: "
+            + (100.0 * CalcCycleProfit(cycle)[0]).toFixed(4) + " %");
+        var invest = USD_INVEST;
+        var out = SimulateCycle(cycle, invest);
+        if (out === null) {
+            console.log("=> Simulation failed");
+        }
+        else {
+            console.log("=> This cycle will turn " + invest + " USD into "
+                + out.toFixed(2) + " USD ("
+                + (100.0 * out / invest).toFixed(4) + " %)");
+        }
+
+        // Depth viability analysis
+        var maxDepthBudget0 = CalcCycleDepthBudget(cycle, 0);
+        var sim0 = SimulateCycle(cycle, maxDepthBudget0);
+        var maxDepthBudget1 = CalcCycleDepthBudget(cycle, 1);
+        var sim1 = SimulateCycle(cycle, maxDepthBudget1);
+        console.log("=> 0-depth budget: " + maxDepthBudget0 + " USD");
+        console.log("   0-depth output: " + sim0.toFixed(2) + " USD ("
+            + (100.0 * sim0 / maxDepthBudget0).toFixed(4) + " %)");
+        console.log("=> 1-depth budget: " + maxDepthBudget1 + " USD");
+        console.log("   1-depth output: " + sim1.toFixed(2) + " USD ("
+            + (100.0 * sim1 / maxDepthBudget1).toFixed(4) + " %)");
+    
+        var site = cycle[0].split("-")[0];
+        if (site === "CEX") {
+            /*TradeCycleRecursive(site, cycle, USD_INVEST, 0, function() {
+                console.log("Done!");
+                console.log(balance);
+            });*/
+        }
+    }
 }
 
 function AnalyzeProfitCycles()
 {
+    var instantCycles = [];
     for (var i = 0; i < profitCycles.length; i++) {
         if (profitCycles[i][0][2] === 0.0) {
             var profit = CalcCycleProfit(profitCycles[i][1]);
-            //console.log("INSTANT PROFIT! (supposedly)");
             if (profit[0] > 1.0 && profit[2] === 0.0) {
-                var string = "INSTANT PROFIT!\n";
-                string += profit.toString();
-                string += profitCycles[i][1].toString();
-                fs.appendFile("cycle-log", string, function() {});
-
-                console.log("INSTANT PROFIT!");
-                console.log(profit);
-                console.log(profitCycles[i][1]);
+                instantCycles.push(profitCycles[i][1]);
             }
         }
+    }
+
+    { // TEST
+        if (links["CEX-XRP"]["CEX-EUR"] !== null) {
+            var cycle = ["CEX-XRP", "CEX-EUR", "CEX-ZEC", "CEX-USD"];
+            var profit = CalcCycleProfit(cycle);
+            instantCycles.push(cycle);
+            //if (instantCycles.length === 1) {
+            //    instantCycles.push(
+            //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
+            //}
+        }
+    }
+    if (instantCycles.length > 0) {
+        var date = new Date(Date.now());
+        var oldLog = console.log;
+        console.log = logger.info;
+
+        console.log();
+        console.log(instantCycles.length + " instant cycle(s) detected");
+        HandleInstantCycles(instantCycles);
+
+        console.log = oldLog;
     }
 }
 
@@ -438,21 +789,11 @@ function Start(sitesIn)
             });
         });
     }
-
     WriteProfitGraph(PROFIT_GRAPH_FILE, WriteGraphCallback);
 
-    /*sites["CEX"].module.GetBalance(function(data) {
-        var usdBalance = Math.floor(parseFloat(data["USD"]));
-        var xrpPrice = 2.20;
-        console.log(usdBalance);
-        console.log(xrpPrice);
-        console.log(usdBalance / xrpPrice);
-        sites["CEX"].module.PlaceOrder("XRP-USD", "buy",
-            usdBalance / xrpPrice, xrpPrice, function(data) {
-                console.log(data);
-            }
-        );
-    });*/
+    sites["CEX"].module.GetBalance(function(b) {
+        balance["CEX"] = b;
+    });
 }
 
 exports.Start = Start;

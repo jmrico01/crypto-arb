@@ -1,10 +1,7 @@
-node_modules/
 package-lock.json
+node_modules/
 build/
 keys/
-temp/*
+temp/
 .vscode/
-
-profit-graph.data
-profit-paths.json
-profitPaths
+logs/
