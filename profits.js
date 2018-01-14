@@ -370,10 +370,16 @@ function CalcTradeDepthBudget(site, curr1, curr2, depth)
 
     var mdEntry;
     if (isBid) {
+        if (depth >= sites[site].module.data[pair].bids.length()) {
+            return null;
+        }
         mdEntry = sites[site].module.data[pair].bids
             .entryByIndex(startIdx - depth);
     }
     else {
+        if (depth >= sites[site].module.data[pair].asks.length()) {
+            return null;
+        }
         mdEntry = sites[site].module.data[pair].asks
             .entryByIndex(startIdx + depth);
     }
@@ -391,7 +397,11 @@ function CalcTradeDepthBudget(site, curr1, curr2, depth)
         return budget;
     }
     else {
-        return budget + CalcTradeDepthBudget(site, curr1, curr2, depth - 1);
+        var prevBudget = CalcTradeDepthBudget(site, curr1, curr2, depth - 1);
+        if (prevBudget === null) {
+            return null;
+        }
+        return budget + prevBudget;
     }
 }
 
@@ -404,6 +414,10 @@ function CalcCycleDepthBudget(cycle, depth)
         var curr1 = cycle[i].split("-")[1];
         var curr2 = cycle[(i+1) % cycle.length].split("-")[1];
         var budget = CalcTradeDepthBudget(site, curr1, curr2, depth);
+        if (budget === null) {
+            console.log("WARNING: depth budget failed, possibly missing data");
+            return null;
+        }
         budget = (budget + link[1]) / link[0];
         link = AddProfits(link, links[cycle[i]][cycle[(i+1) % cycle.length]]);
         //console.log(curr1 + "-" + curr2 + " budget: " + budget);
@@ -446,12 +460,22 @@ function HandleInstantCycles(cycles)
         var sim0 = SimulateCycle(cycle, maxDepthBudget0);
         var maxDepthBudget1 = CalcCycleDepthBudget(cycle, 1);
         var sim1 = SimulateCycle(cycle, maxDepthBudget1);
-        console.log("=> 0-depth budget: " + maxDepthBudget0 + " USD");
-        console.log("   0-depth output: " + sim0.toFixed(2) + " USD ("
-            + (100.0 * sim0 / maxDepthBudget0).toFixed(4) + " %)");
-        console.log("=> 1-depth budget: " + maxDepthBudget1 + " USD");
-        console.log("   1-depth output: " + sim1.toFixed(2) + " USD ("
-            + (100.0 * sim1 / maxDepthBudget1).toFixed(4) + " %)");
+        if (maxDepthBudget0 !== null && sim0 !== null) {
+            console.log("=> 0-depth budget: " + maxDepthBudget0 + " USD");
+            console.log("   0-depth output: " + sim0.toFixed(2) + " USD ("
+                + (100.0 * sim0 / maxDepthBudget0).toFixed(4) + " %)");
+        }
+        else {
+            console.log("=> 0-depth budget calculation failed");
+        }
+        if (maxDepthBudget1 !== null && sim1 !== null) {
+            console.log("=> 1-depth budget: " + maxDepthBudget1 + " USD");
+            console.log("   1-depth output: " + sim1.toFixed(2) + " USD ("
+                + (100.0 * sim1 / maxDepthBudget1).toFixed(4) + " %)");
+        }
+        else {
+            console.log("=> 1-depth budget calculation failed");
+        }
     
         var site = cycle[0].split("-")[0];
         if (site === "CEX") {
@@ -475,7 +499,7 @@ function AnalyzeProfitCycles()
         }
     }
 
-    { // TEST
+    /*{ // TEST
         if (links["CEX-XRP"]["CEX-EUR"] !== null) {
             var cycle = ["CEX-XRP", "CEX-EUR", "CEX-ZEC", "CEX-USD"];
             var profit = CalcCycleProfit(cycle);
@@ -485,7 +509,7 @@ function AnalyzeProfitCycles()
             //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
             //}
         }
-    }
+    }*/
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;

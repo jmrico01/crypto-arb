@@ -16,7 +16,7 @@ const profits = require("./profits");
 
 const sites = {
     "Bitstamp": {
-        enabled: false,
+        enabled: true,
         module: bitstamp,
         entryParser: function(entry) {
             return entry;
@@ -34,14 +34,14 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: false, // site down for now
+        enabled: false,
         module: kraken,
         entryParser: function(entry) {
             return entry;
         }
     },
     "OKCoin": {
-        enabled: false,
+        enabled: true,
         module: okcoin,
         entryParser: function(entry) {
             return entry;

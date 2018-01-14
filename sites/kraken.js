@@ -171,10 +171,6 @@ function SubmitPublicRequest(type, args, callback)
     https.get(options, function(res) {
         HandleResponse(res, callback);
     });
-
-    req.on("error", function(err) {
-        Print("Request error: " + err.message);
-    });
 }
 
 function ClearData(pair)
