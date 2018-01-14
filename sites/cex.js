@@ -42,8 +42,7 @@ function CreateConnection()
 {
     var ws = null;
 
-    // TODO I changed this!
-    var RATE_LIMIT_MIN_TIME = 0.05; // secs
+    var SUBSCRIBE_TIME = 0.5; // secs
 
     var checkConnInterval = null;
     var CHECK_CONN_TIME = 10; // secs
@@ -299,7 +298,7 @@ function CreateConnection()
                 "oid": "0"
             };
             WebSocketSend(orderBookSub);
-        }, i * RATE_LIMIT_MIN_TIME * 1000));
+        }, i * SUBSCRIBE_TIME * 1000));
     }
     
     function OnAuthenticated()
@@ -321,7 +320,7 @@ function CreateConnection()
                 nextPair = (nextPair + 1) % pairs.length;
                 Rebuild(pair);
             }, REBUILD_ORDER_BOOK_TIME * 1000);
-        }, pairs.length * RATE_LIMIT_MIN_TIME * 1000));
+        }, pairs.length * SUBSCRIBE_TIME * 1000));
     }
     
     function OnIncoming(msg)

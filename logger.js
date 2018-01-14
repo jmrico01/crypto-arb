@@ -1,7 +1,7 @@
 const fs = require("fs");
 const winston = require("winston");
 const logDir = "public/logs";
-const logName = "output.log";
+const logName = "output2.log";
 
 if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir);
@@ -21,7 +21,7 @@ function GetTimestamp()
     });
 }
 
-const logger = new (winston.Logger)({
+const cycleLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             timestamp: GetTimestamp,
@@ -36,4 +36,4 @@ const logger = new (winston.Logger)({
     ]
 });
 
-exports.info = logger.info;
+exports.cycle = cycleLogger;

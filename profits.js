@@ -5,7 +5,7 @@ const PROFIT_GRAPH_FILE = "temp/profit-graph.data";
 const PROFIT_PATHS_FILE = "temp/profit-paths.json";
 const PROFIT_CYCLES_FILE = "temp/profit-cycles.json";
 
-const logger = require("./logger");
+const cycleLog = require("./logger").cycle;
 const fs = require("fs");
 const childProcess = require("child_process");
 const fees = require("./sites/fees");
@@ -239,7 +239,7 @@ function SimulateCycle(cycle, invest)
 var balance = {
     // this gets updated at start
 };
-const USD_INVEST = 30.00;
+const USD_MIN_INVEST = 30.00;
 
 function TrimFloat(float, characters)
 {
@@ -429,30 +429,75 @@ function CalcCycleDepthBudget(cycle, depth)
     return depthBudget;
 }
 
+function GetCycleMinTrade(cycle)
+{
+    var site = cycle[0].split("-")[0];
+    var link = [ 1.00, 0.00, 0.0 ];
+    var cycleMinTrade = 0.0;
+    for (var i = 0; i < cycle.length; i++) {
+        var curr1 = cycle[i].split("-")[1];
+        var curr2 = cycle[(i+1) % cycle.length].split("-")[1];
+        var pair = [curr1, curr2];
+        if (!sites[site].module.data.hasOwnProperty(pair.join("-"))) {
+            pair = [curr2, curr1];
+        }
+        var minTrade = fees.MinTrade(site, pair[0], pair[1]);
+        if (minTrade === null) {
+            console.log("WARNING: " + site
+                + " missing minTrade for " + pair.join("-"));
+            return null;
+        }
+        if (pair[minTrade[1]] === curr1) {
+            minTrade[0] = (minTrade[0] + link[1]) / link[0];
+        }
+        link = AddProfits(link, links[cycle[i]][cycle[(i+1) % cycle.length]]);
+        if (pair[minTrade[1]] === curr2) {
+            minTrade[0] = (minTrade[0] + link[1]) / link[0];
+        }
+        if (minTrade[0] > cycleMinTrade) {
+            cycleMinTrade = minTrade[0];
+        }
+    }
+
+    return cycleMinTrade;
+}
+
 function HandleInstantCycles(cycles)
 {
     for (var i = 0; i < cycles.length; i++) {
-        console.log("===> Cycle " + i);
-        console.log(cycles[i]);
+        cycleLog.info("===> Cycle " + i);
+        cycleLog.info(cycles[i]);
         var cycle = cycles[i];
         var cycle = ShiftCycleToStartCurrency(cycles[i], "USD");
         if (cycle === null) {
-            console.log("=> Instant cycle without USD");
+            cycleLog.info("=> Instant cycle without USD");
             continue;
         }
-        console.log(cycle);
-    
-        console.log("=> Theoretical output: "
+        cycleLog.info(cycle);
+        cycleLog.info("=> Theoretical output: "
             + (100.0 * CalcCycleProfit(cycle)[0]).toFixed(4) + " %");
-        var invest = USD_INVEST;
-        var out = SimulateCycle(cycle, invest);
-        if (out === null) {
-            console.log("=> Simulation failed");
+
+        var minTrade = GetCycleMinTrade(cycle);
+        if (minTrade === null) {
+            cycleLog.info("=> Minimum trade failed");
         }
         else {
-            console.log("=> This cycle will turn " + invest + " USD into "
-                + out.toFixed(2) + " USD ("
-                + (100.0 * out / invest).toFixed(4) + " %)");
+            cycleLog.info("=> Minimum trade amount: "
+                + minTrade.toFixed(2) + " USD");
+            var minTradeOut = SimulateCycle(cycle, minTrade);
+            if (minTradeOut === null) {
+                cycleLog.info("=> Minimum trade simulation failed");
+            }
+            else {
+                cycleLog.info("   Minimum trade output: "
+                    + minTradeOut.toFixed(2) + " USD ("
+                    + (100.0 * minTradeOut / minTrade).toFixed(4) + "%)");
+                
+                // Profit is not possible from this cycle
+                if (minTradeOut / minTrade < 1.0) {
+                    continue;
+                }
+            }
         }
 
         // Depth viability analysis
@@ -461,27 +506,29 @@ function HandleInstantCycles(cycles)
         var maxDepthBudget1 = CalcCycleDepthBudget(cycle, 1);
         var sim1 = SimulateCycle(cycle, maxDepthBudget1);
         if (maxDepthBudget0 !== null && sim0 !== null) {
-            console.log("=> 0-depth budget: " + maxDepthBudget0 + " USD");
-            console.log("   0-depth output: " + sim0.toFixed(2) + " USD ("
+            cycleLog.info("=> 0-depth budget: "
+                + maxDepthBudget0.toFixed(2) + " USD");
+            cycleLog.info("   0-depth output: " + sim0.toFixed(2) + " USD ("
                 + (100.0 * sim0 / maxDepthBudget0).toFixed(4) + " %)");
         }
         else {
-            console.log("=> 0-depth budget calculation failed");
+            cycleLog.info("=> 0-depth budget calculation failed");
         }
         if (maxDepthBudget1 !== null && sim1 !== null) {
-            console.log("=> 1-depth budget: " + maxDepthBudget1 + " USD");
-            console.log("   1-depth output: " + sim1.toFixed(2) + " USD ("
+            cycleLog.info("=> 1-depth budget: "
+                + maxDepthBudget1.toFixed(2) + " USD");
+            cycleLog.info("   1-depth output: " + sim1.toFixed(2) + " USD ("
                 + (100.0 * sim1 / maxDepthBudget1).toFixed(4) + " %)");
         }
         else {
-            console.log("=> 1-depth budget calculation failed");
+            cycleLog.info("=> 1-depth budget calculation failed");
         }
     
         var site = cycle[0].split("-")[0];
         if (site === "CEX") {
-            /*TradeCycleRecursive(site, cycle, USD_INVEST, 0, function() {
-                console.log("Done!");
-                console.log(balance);
+            /*TradeCycleRecursive(site, cycle, invest, 0, function() {
+                cycleLog.info("Done!");
+                cycleLog.info(balance);
             });*/
         }
     }
@@ -501,8 +548,20 @@ function AnalyzeProfitCycles()
 
     /*{ // TEST
         if (links["CEX-XRP"]["CEX-EUR"] !== null) {
-            var cycle = ["CEX-XRP", "CEX-EUR", "CEX-ZEC", "CEX-USD"];
-            var profit = CalcCycleProfit(cycle);
+            var cycle;
+            var profit;
+
+            cycle = ["CEX-XRP", "CEX-EUR", "CEX-ZEC", "CEX-USD"];
+            profit = CalcCycleProfit(cycle);
+            instantCycles.push(cycle);
+            cycle = ["CEX-EUR", "CEX-ETH", "CEX-BTC", "CEX-USD", "CEX-BTG"];
+            profit = CalcCycleProfit(cycle);
+            instantCycles.push(cycle);
+            cycle = ["Bitstamp-LTC", "Bitstamp-USD", "Bitstamp-BTC"];
+            profit = CalcCycleProfit(cycle);
+            instantCycles.push(cycle);
+            cycle = ["Bitstamp-LTC", "Bitstamp-USD", "Bitstamp-BTC", "Bitstamp-EUR"];
+            profit = CalcCycleProfit(cycle);
             instantCycles.push(cycle);
             //if (instantCycles.length === 1) {
             //    instantCycles.push(
@@ -513,10 +572,10 @@ function AnalyzeProfitCycles()
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;
-        console.log = logger.info;
+        console.log = cycleLog.debug;
 
-        console.log();
-        console.log(instantCycles.length + " instant cycle(s) detected");
+        cycleLog.info();
+        cycleLog.info(instantCycles.length + " instant cycle(s) detected");
         HandleInstantCycles(instantCycles);
 
         console.log = oldLog;

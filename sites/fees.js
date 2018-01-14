@@ -17,7 +17,18 @@ const fees = {
             default: [0.0, 0.00]
         },
         taker: [0.25 / 100.0, 0.0],
-        maker: [0.25 / 100.0, 0.0]
+        maker: [0.25 / 100.0, 0.0],
+        minTrade: function(curr1, curr2) {
+            var curr2MinTrades = {
+                "USD": 5.00,
+                "EUR": 5.00,
+                "BTC": 0.001
+            };
+            if (!curr2MinTrades.hasOwnProperty(curr2)) {
+                return null;
+            }
+            return [curr2MinTrades[curr2], 1];
+        }
     },
     "CEX": {
         deposit: {
@@ -39,7 +50,23 @@ const fees = {
             "ZEC": [0.0, 0.001]
         },
         taker: [0.25 / 100.0, 0.0],
-        maker: [0.16 / 100.0, 0.0]
+        maker: [0.16 / 100.0, 0.0],
+        minTrade: function(curr1, curr2) {
+            var curr1MinTrades = {
+                "BTC": 0.01,
+                "ETH": 0.1,
+                "BCH": 0.01,
+                "BTG": 0.01,
+                "DASH": 0.01,
+                "XRP": 10.00,
+                "ZEC": 0.01,
+                "GHS": 100.0
+            };
+            if (!curr1MinTrades.hasOwnProperty(curr1)) {
+                return null;
+            }
+            return [curr1MinTrades[curr1], 0];
+        }
     },
     "Kraken": {
         deposit: {
@@ -176,7 +203,20 @@ function Exchange(site, curr1, curr2)
     return fees[site].taker;
 }
 
+function MinTrade(site, curr1, curr2)
+{
+    if (!fees.hasOwnProperty(site)) {
+        return null;
+    }
+    if (!fees[site].hasOwnProperty("minTrade")) {
+        return null;
+    }
+
+    return fees[site].minTrade(curr1, curr2);
+}
+
 exports.fees = fees;
 exports.Deposit = Deposit;
 exports.Withdraw = Withdraw;
 exports.Exchange = Exchange;
+exports.MinTrade = MinTrade;
