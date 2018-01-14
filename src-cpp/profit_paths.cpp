@@ -181,7 +181,8 @@ void RecordCycle(
     std::vector<Path>& cycles)
 {
     Link profit = CalcCycleProfit(links, path, pathLen);
-    if (profit.frac > 1.0) {
+    // TODO only writing immediate cycles for now
+    if (profit.frac > 1.0 && profit.time == 0.0) {
         std::vector<int> cycle(pathLen);
         for (int i = 0; i < pathLen; i++) {
             cycle[i] = path[i];
