@@ -96,7 +96,7 @@ function CreateConnection()
         for (var i = 0; i < timeouts.length; i++) {
             clearTimeout(timeouts[i]);
         }
-        timeouts.clear();
+        timeouts = [];
 
         if (ws !== null) {
             ws.on("message", function() {});

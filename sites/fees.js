@@ -97,7 +97,33 @@ const fees = {
             "BCH": [0.0, 0.001]
         },
         taker: [0.26 / 100.0, 0.0],
-        maker: [0.16 / 100.0, 0.0]
+        maker: [0.16 / 100.0, 0.0],
+        minTrade: function(curr1, curr2) {
+            // https://support.kraken,com/hc/en-us/articles/205893708-What-is-the-minimum-order-size-
+            var curr1MinTrades = {
+                "REP": 0.3,
+                "BTC": 0.002,
+                "BCH": 0.002,
+                "DASH": 0.03,
+                "DOGE": 3000.0,
+                "EOS": 3.0,
+                "ETH": 0.02,
+                "ETC": 0.3,
+                "GNO": 0.03,
+                "ICN": 2.0,
+                "LTC": 0.1,
+                "MLN": 0.1,
+                "XMR": 0.1,
+                "XRP": 30.0,
+                "XLM": 300.0,
+                "ZEC": 0.03,
+                "USDT": 5.00
+            };
+            if (!curr1MinTrades.hasOwnProperty(curr1)) {
+                return null;
+            }
+            return [curr1MinTrades[curr1], 0];
+        }
     },
     "OKCoin": {
         deposit: {
