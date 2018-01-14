@@ -499,7 +499,7 @@ function AnalyzeProfitCycles()
         }
     }
 
-    { // TEST
+    /*{ // TEST
         if (links["CEX-XRP"]["CEX-EUR"] !== null) {
             var cycle = ["CEX-XRP", "CEX-EUR", "CEX-ZEC", "CEX-USD"];
             var profit = CalcCycleProfit(cycle);
@@ -509,7 +509,7 @@ function AnalyzeProfitCycles()
             //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
             //}
         }
-    }
+    }*/
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;
