@@ -272,42 +272,49 @@ function Trade(site, curr1, curr2, curr1Amount, callback)
             amount = TrimFloat(amount, 8);
         }
 
-        //console.log(prices);
-        console.log("-> " + action + " " + amount + " "
+        //cycleLog.info(prices);
+        cycleLog.info("-> " + action + " " + amount + " "
             + pair[0] + "-" + pair[1] + " for " + price);
 
         // TEST
-        /*var newBalance = JSON.parse(JSON.stringify(balance[site]));
-        if (action === "buy") {
-            newBalance[curr1] = parseFloat(newBalance[curr1])
-                - amount * price * (1.0 - exchangeFee[0]);
-            newBalance[curr2] = parseFloat(newBalance[curr2]) + amount;
-        }
-        else {
-            newBalance[curr1] = parseFloat(newBalance[curr1]) - amount;
-            newBalance[curr2] = parseFloat(newBalance[curr2])
-                + amount * price;
-        }
-        var curr2Delta = parseFloat(newBalance[curr2])
-            - parseFloat(balance[site][curr2]);
-        balance[site] = newBalance
-        console.log(balance[site]);
-        console.log("made " + curr2Delta + " " + curr2);
-        callback(curr2Delta);*/
+        sites[site].module.GetBalance(function(ignore) {
+            // dummy API call for rate limit and stuff
+            cycleLog.info("Order executed (DUMMY)!!")
+            sites[site].module.GetBalance(function(ignoreThisBalance) {
+                // GetBalance dummy API call. ignore the result
+                var newBalance = JSON.parse(JSON.stringify(balance[site]));
+                if (action === "buy") {
+                    newBalance[curr1] = parseFloat(newBalance[curr1])
+                        - amount * price * (1.0 - exchangeFee[0]);
+                    newBalance[curr2] = parseFloat(newBalance[curr2]) + amount;
+                }
+                else {
+                    newBalance[curr1] = parseFloat(newBalance[curr1]) - amount;
+                    newBalance[curr2] = parseFloat(newBalance[curr2])
+                        + amount * price;
+                }
+                var curr2Delta = parseFloat(newBalance[curr2])
+                    - parseFloat(balance[site][curr2]);
+                balance[site] = newBalance
+                cycleLog.info(balance[site]);
+                cycleLog.info("made " + curr2Delta + " " + curr2);
+                callback(curr2Delta);
+            });
+        })
         /*sites[site].module.PlaceOrder(pair, action, price, amount,
             function(price, amount, err) {
                 if (err) {
-                    console.log(err);
+                    cycleLog.info(err);
                     return;
                 }
 
-                console.log("Order executed!!");
-                console.log(amount + " " + pair.toString() + " for " + price);
+                cycleLog.info("Order executed!!");
+                cycleLog.info(amount + " " + pair.toString() + " for " + price);
                 sites[site].module.GetBalance(function(newBalance) {
                     var curr2Delta = parseFloat(newBalance[curr2])
                         - parseFloat(balance[site][curr2]);
                     balance[site] = newBalance;
-                    console.log("made " + curr2Delta + " " + curr2);
+                    cycleLog.info("made " + curr2Delta + " " + curr2);
                     callback(curr2Delta);
                 });
             }
@@ -327,6 +334,22 @@ function TradeCycleRecursive(site, cycle, invest, i, callback)
             TradeCycleRecursive(site, cycle, output, i + 1, callback);
         }
     );
+}
+
+var executingCycle = false;
+function ExecuteCycle(cycle, invest, callback)
+{
+    if (executingCycle) {
+        return;
+    }
+    executingCycle = true;
+    cycleLog.info("Executing cycle with investment " + invest);
+
+    var site = cycle[0].split("-")[0];
+    TradeCycleRecursive(site, cycle, invest, 0, function() {
+        executingCycle = false;
+        callback();
+    });
 }
 
 function ShiftCycleToStartCurrency(cycle, currency)
@@ -464,37 +487,59 @@ function GetCycleMinTrade(cycle)
 
 function HandleInstantCycles(cycles)
 {
+    var maxMinTradeProfit = 0.0;
+    var maxMinTradeOut = 0.0;
+    var maxMinTrade = 0.0;
+    var maxCycle = null;
     for (var i = 0; i < cycles.length; i++) {
-        cycleLog.info("===> Cycle " + i);
-        cycleLog.info(cycles[i]);
+        cycleLog.verbose("===> Cycle " + i);
+        cycleLog.verbose(cycles[i]);
         var cycle = cycles[i];
         var cycle = ShiftCycleToStartCurrency(cycles[i], "USD");
         if (cycle === null) {
-            cycleLog.info("=> Instant cycle without USD");
+            cycleLog.verbose("=> Instant cycle without USD");
             continue;
         }
-        cycleLog.info(cycle);
-        cycleLog.info("=> Theoretical output: "
+        cycleLog.verbose(cycle);
+        cycleLog.verbose("=> Theoretical output: "
             + (100.0 * CalcCycleProfit(cycle)[0]).toFixed(4) + " %");
 
         var minTrade = GetCycleMinTrade(cycle);
         if (minTrade === null) {
-            cycleLog.info("=> Minimum trade failed");
+            cycleLog.verbose("=> Minimum trade failed");
+            continue;
         }
         else {
-            cycleLog.info("=> Minimum trade amount: "
+            minTrade = Math.ceil(minTrade);
+            cycleLog.verbose("=> Minimum trade (ceil): "
                 + minTrade.toFixed(2) + " USD");
             var minTradeOut = SimulateCycle(cycle, minTrade);
             if (minTradeOut === null) {
-                cycleLog.info("=> Minimum trade simulation failed");
+                cycleLog.verbose("=> Minimum trade simulation failed");
+                continue;
             }
             else {
-                cycleLog.info("   Minimum trade output: "
+                var minTradeProfit = minTradeOut / minTrade;
+                cycleLog.verbose("   Minimum trade output: "
                     + minTradeOut.toFixed(2) + " USD ("
-                    + (100.0 * minTradeOut / minTrade).toFixed(4) + "%)");
+                    + (100.0 * minTradeProfit).toFixed(4) + "%)");
                 
                 // Profit is not possible from this cycle
-                if (minTradeOut / minTrade < 1.0) {
+                if (minTradeProfit > 1.0) {
+                    maxMinTradeProfit = minTradeProfit;
+                    maxMinTradeOut = minTradeOut;
+                    maxMinTrade = minTrade;
+                    maxCycle = cycle;
+                    // TODO temporary
+                    continue;
+                }
+                else {
+                    if (cycle[0].split("-")[0] === "CEX") {
+                    maxMinTradeProfit = minTradeProfit;
+                    maxMinTradeOut = minTradeOut;
+                    maxMinTrade = minTrade;
+                    maxCycle = cycle;
+                    }
                     continue;
                 }
             }
@@ -506,30 +551,41 @@ function HandleInstantCycles(cycles)
         var maxDepthBudget1 = CalcCycleDepthBudget(cycle, 1);
         var sim1 = SimulateCycle(cycle, maxDepthBudget1);
         if (maxDepthBudget0 !== null && sim0 !== null) {
-            cycleLog.info("=> 0-depth budget: "
+            cycleLog.verbose("=> 0-depth budget: "
                 + maxDepthBudget0.toFixed(2) + " USD");
-            cycleLog.info("   0-depth output: " + sim0.toFixed(2) + " USD ("
+            cycleLog.verbose("   0-depth output: " + sim0.toFixed(2) + " USD ("
                 + (100.0 * sim0 / maxDepthBudget0).toFixed(4) + " %)");
         }
         else {
-            cycleLog.info("=> 0-depth budget calculation failed");
+            cycleLog.verbose("=> 0-depth budget calculation failed");
         }
         if (maxDepthBudget1 !== null && sim1 !== null) {
-            cycleLog.info("=> 1-depth budget: "
+            cycleLog.verbose("=> 1-depth budget: "
                 + maxDepthBudget1.toFixed(2) + " USD");
-            cycleLog.info("   1-depth output: " + sim1.toFixed(2) + " USD ("
+            cycleLog.verbose("   1-depth output: " + sim1.toFixed(2) + " USD ("
                 + (100.0 * sim1 / maxDepthBudget1).toFixed(4) + " %)");
         }
         else {
-            cycleLog.info("=> 1-depth budget calculation failed");
+            cycleLog.verbose("=> 1-depth budget calculation failed");
         }
-    
-        var site = cycle[0].split("-")[0];
-        if (site === "CEX") {
-            /*TradeCycleRecursive(site, cycle, invest, 0, function() {
-                cycleLog.info("Done!");
+    }
+
+    if (!executingCycle && maxMinTradeProfit > 1.0) {
+    //if (!executingCycle && maxCycle !== null) {
+        // Check that we're making actual money
+        // (probably make this higher later)
+        var site = maxCycle[0].split("-")[0];
+        //if (site === "CEX") {
+        if (site === "CEX" && maxMinTradeOut - maxMinTrade >= 0.01) {
+            cycleLog.info("========== LEGIT CYCLE ==========");
+            cycleLog.info(maxCycle);
+            cycleLog.info("minTrade (ceil): " + maxMinTrade    + " USD");
+            cycleLog.info("minTradeOut:     " + maxMinTradeOut + " USD"
+                + " ( " + (100.0 * maxMinTradeProfit).toFixed(4) + " % )");
+            ExecuteCycle(maxCycle, maxMinTrade, function() {
+                cycleLog.info("DONE! With " + site + " balance:");
                 cycleLog.info(balance);
-            });*/
+            });
         }
     }
 }
@@ -572,10 +628,10 @@ function AnalyzeProfitCycles()
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;
-        console.log = cycleLog.debug;
+        console.log = cycleLog.verbose;
 
-        cycleLog.info();
-        cycleLog.info(instantCycles.length + " instant cycle(s) detected");
+        cycleLog.verbose("");
+        cycleLog.verbose(instantCycles.length + " instant cycle(s) detected");
         HandleInstantCycles(instantCycles);
 
         console.log = oldLog;

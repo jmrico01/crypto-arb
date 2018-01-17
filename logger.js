@@ -1,7 +1,8 @@
 const fs = require("fs");
 const winston = require("winston");
 const logDir = "public/logs";
-const logName = "output2.log";
+const logFileLong = "outputLong.log";
+const logFileTrades = "outputTrades.log";
 
 if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir);
@@ -25,13 +26,21 @@ const cycleLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             timestamp: GetTimestamp,
+            level: "info"
+        }),
+        new (winston.transports.File)({
+            json: false,
+            name: "long",
+            filename: logDir + "/" + logFileLong,
+            timestamp: GetTimestamp,
             level: "debug"
         }),
         new (winston.transports.File)({
             json: false,
-            filename: logDir + "/" + logName,
+            name: "trades",
+            filename: logDir + "/" + logFileTrades,
             timestamp: GetTimestamp,
-            level: "debug"
+            level: "info"
         })
     ]
 });
