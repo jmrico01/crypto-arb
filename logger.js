@@ -26,7 +26,7 @@ const cycleLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             timestamp: GetTimestamp,
-            level: "info"
+            level: "debug"
         }),
         new (winston.transports.File)({
             json: false,
@@ -34,7 +34,11 @@ const cycleLogger = new (winston.Logger)({
             filename: logDir + "/" + logFileLong,
             timestamp: GetTimestamp,
             level: "debug"
-        }),
+        })
+    ]
+});
+const cycleTradeLogger = new (winston.Logger)({
+    transports: [
         new (winston.transports.File)({
             json: false,
             name: "trades",
@@ -43,6 +47,7 @@ const cycleLogger = new (winston.Logger)({
             level: "info"
         })
     ]
-});
+})
 
+cycleLogger.info = cycleTradeLogger.info;
 exports.cycle = cycleLogger;

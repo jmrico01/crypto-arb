@@ -34,7 +34,7 @@ const sites = {
         }
     },
     "Kraken": {
-        enabled: false,
+        enabled: true,
         module: kraken,
         entryParser: function(entry) {
             return entry;

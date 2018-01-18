@@ -288,27 +288,31 @@ static bool ReadLine(FILE* file, char* buf, int bufSize)
     return true;
 }
 
-static bool ParseNodeNames(char** nodes, int numNodes, char* str)
+static bool ParseNames(char** names, int n, char* str)
 {
-    int node = 0;
+    int name = 0;
     int i = 0;
-    int iNode = 0;
+    int iName = 0;
     while (true) {
         if (str[i] == ',' || str[i] == '\0') {
-            nodes[node++][iNode] = '\0';
+            names[name++][iName] = '\0';
             if (str[i] == '\0') {
                 break;
             }
+            if (name >= n) {
+                fprintf(stderr, "number of names != number of parsed names\n");
+                return false;
+            }
             i++;
-            iNode = 0;
+            iName = 0;
         }
         else {
-            nodes[node][iNode++] = str[i++];
+            names[name][iName++] = str[i++];
         }
     }
 
-    if (node != numNodes) {
-        fprintf(stderr, "numNodes != number of parsed nodes");
+    if (name != n) {
+        fprintf(stderr, "number of names != number of parsed names\n");
         return false;
     }
 
@@ -405,7 +409,11 @@ static bool ParseLinks(Link** links, int numNodes, FILE* file, char* buf)
     return true;
 }
 
-static void Cleanup(FILE* file, int numNodes, char** nodes, Link** links)
+static void Cleanup(
+    FILE* file,
+    int numSites, char** sites,
+    int numNodes, char** nodes,
+    Link** links)
 {
     if (links) {
         for (int i = 0; i < numNodes; i++) {
@@ -419,6 +427,12 @@ static void Cleanup(FILE* file, int numNodes, char** nodes, Link** links)
         }
         free(nodes);
     }
+    if (sites) {
+        for (int i = 0; i < numSites; i++) {
+            free(sites[i]);
+        }
+        free(sites);
+    }
 
     if (file) {
         fclose(file);
@@ -427,9 +441,9 @@ static void Cleanup(FILE* file, int numNodes, char** nodes, Link** links)
 
 int main(int argc, char* argv[])
 {
-    if (argc != 4) {
-        fprintf(stderr, "Expected 3 arguments: %s",
-            "inFile, pathsFile, cyclesFile");
+    if (argc != 5) {
+        fprintf(stderr, "Expected 4 arguments: %s",
+            "inFile, pathsFile, cyclesFile, mode (instant_cycles/...)");
         return 1;
     }
 
@@ -441,14 +455,46 @@ int main(int argc, char* argv[])
     }
 
     char buf[LINE_BUF_LEN];
+    char* e;
 
     // Read number of nodes
     if (!ReadLine(file, buf, LINE_BUF_LEN)) {
         fprintf(stderr, "Graph data incomplete");
-        Cleanup(file, 0, 0, 0);
+        Cleanup(file, 0, 0, 0, 0, 0);
         return 0;
     }
-    char* e;
+    int numSites = (int)strtol(buf, &e, 10);
+    if (*e != '\0') {
+        fprintf(stderr, "Invalid number of sites");
+        return 0;
+    }
+
+    // Allocate memory for site names
+    // TODO make contiguous?
+    //printf("Sites: %d\n", numSites);
+    char** sites = (char**)malloc(numSites * sizeof(char*));
+    for (int i = 0; i < numSites; i++) {
+        sites[i] = (char*)malloc(NODE_NAME_MAX_LEN * sizeof(char));
+    }
+
+    // Read site names
+    if (!ReadLine(file, buf, LINE_BUF_LEN)) {
+        fprintf(stderr, "Graph data incomplete");
+        Cleanup(file, numSites, sites, 0, 0, 0);
+        return 0;
+    }
+    if (!ParseNames(sites, numSites, buf)) {
+        fprintf(stderr, "Failed to parse site names");
+        Cleanup(file, numSites, sites, 0, 0, 0);
+        return 1;
+    }
+
+    // Read number of nodes
+    if (!ReadLine(file, buf, LINE_BUF_LEN)) {
+        fprintf(stderr, "Graph data incomplete");
+        Cleanup(file, numSites, sites, 0, 0, 0);
+        return 0;
+    }
     int numNodes = (int)strtol(buf, &e, 10);
     if (*e != '\0') {
         fprintf(stderr, "Invalid number of nodes");
@@ -466,11 +512,12 @@ int main(int argc, char* argv[])
     // Read node names
     if (!ReadLine(file, buf, LINE_BUF_LEN)) {
         fprintf(stderr, "Graph data incomplete");
-        Cleanup(file, numNodes, nodes, 0);
+        Cleanup(file, numSites, sites, numNodes, nodes, 0);
         return 0;
     }
-    if (!ParseNodeNames(nodes, numNodes, buf)) {
-        Cleanup(file, numNodes, nodes, 0);
+    if (!ParseNames(nodes, numNodes, buf)) {
+        fprintf(stderr, "Failed to parse node names");
+        Cleanup(file, numSites, sites, numNodes, nodes, 0);
         return 1;
     }
 
@@ -486,14 +533,19 @@ int main(int argc, char* argv[])
 
     // Read links
     if (!ParseLinks(links, numNodes, file, buf)) {
-        Cleanup(file, numNodes, nodes, links);
+        Cleanup(file, numSites, sites, numNodes, nodes, links);
         return 0;
     }
 
     fclose(file);
 
     // Print graph (debug)
-    /*for (int i = 0; i < numNodes; i++) {
+    /*printf("Sites: ");
+    for (int i = 0; i < numSites; i++) {
+        printf("%s, ", sites[i]);
+    }
+    printf("\n");
+    for (int i = 0; i < numNodes; i++) {
         printf("%s\n", nodes[i]);
         for (int j = 0; j < numNodes; j++) {
             if (links[i][j].frac != 0.0) {
@@ -512,6 +564,21 @@ int main(int argc, char* argv[])
     //printf("  paths time: %f\n", Time(0));
     //fflush(stdout);
 
+    if (strncmp(argv[4], "instant_cycles", 64) == 0) {
+        //printf("Instant cycles mode\n");
+        for (int i = 0; i < numNodes; i++) {
+            for (int j = 0; j < numNodes; j++) {
+                if (links[i][j].time != 0.0) {
+                    links[i][j] = { 0.0, 0.00, 0.0 };
+                }
+            }
+        }
+    }
+    else {
+        fprintf(stderr, "Invalid operation mode");
+        return 1;
+    }
+
     Time(0);
     std::vector<Path> profitCycles;
     FindProfitCycles(numNodes, (const Link**)links, profitCycles);
@@ -522,7 +589,7 @@ int main(int argc, char* argv[])
     FILE* outFile = fopen(argv[2], "w");
     if (!outFile) {
         fprintf(stderr, "Couldn't open paths out file: %s", argv[2]);
-        Cleanup(0, numNodes, nodes, links);
+        Cleanup(0, numSites, sites, numNodes, nodes, links);
         return 1;
     }
     WritePaths(outFile, nodes, profitPaths, (int)profitPaths.size());
@@ -532,13 +599,13 @@ int main(int argc, char* argv[])
     outFile = fopen(argv[3], "w");
     if (!outFile) {
         fprintf(stderr, "Couldn't open cycles out file: %s", argv[3]);
-        Cleanup(0, numNodes, nodes, links);
+        Cleanup(0, numSites, sites, numNodes, nodes, links);
         return 1;
     }
     WritePaths(outFile, nodes, profitCycles, (int)profitCycles.size());
     fclose(outFile);
 
-    Cleanup(0, numNodes, nodes, links);
+    Cleanup(0, numSites, sites, numNodes, nodes, links);
 
     //printf("done\n");
     return 0;
