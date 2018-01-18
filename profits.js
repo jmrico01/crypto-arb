@@ -824,6 +824,9 @@ function Start(sitesIn)
         }
 
         var feeWithdraw = [0.0, 0.00];
+        if (site === "CEX" && depositMethod[site] === "card") {
+            feeWithdraw = [3.00 / 100.0, 10.00]; // Tested
+        }
         if (depositMethod[site] === "wire") {
             feeWithdraw = FEE_BOFA_WIRE;
         }
