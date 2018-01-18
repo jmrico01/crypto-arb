@@ -586,17 +586,19 @@ function HandleInstantCycles(cycles)
         var site = maxCycle[0].split("-")[0];
         // Check that we're making actual money
         // (probably make this higher later)
-        if (site === "CEX" && maxMinTradeOut - maxMinTrade >= 0.05) {
+        if (maxMinTradeOut - maxMinTrade >= 0.05) {
         //if (site === "CEX") {
             cycleLog.info("========== LEGIT CYCLE ==========");
             cycleLog.info(maxCycle);
             cycleLog.info("minTrade (ceil): " + maxMinTrade    + " USD");
             cycleLog.info("minTradeOut:     " + maxMinTradeOut + " USD"
                 + " ( " + (100.0 * maxMinTradeProfit).toFixed(4) + " % )");
-            ExecuteCycle(maxCycle, maxMinTrade, function() {
-                cycleLog.info("DONE! With " + site + " balance:");
-                cycleLog.info(balance);
-            });
+            if (site === "CEX") {
+                ExecuteCycle(maxCycle, maxMinTrade, function() {
+                    cycleLog.info("DONE! With " + site + " balance:");
+                    cycleLog.info(balance);
+                });
+            }
         }
     }
 }
