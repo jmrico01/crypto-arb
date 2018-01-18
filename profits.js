@@ -613,7 +613,7 @@ function AnalyzeProfitCycles()
         }
     }
 
-    { // TEST
+    /*{ // TEST
         var cycle;
         var profit;
 
@@ -636,7 +636,7 @@ function AnalyzeProfitCycles()
         //    instantCycles.push(
         //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
         //}
-    }
+    }*/
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;
