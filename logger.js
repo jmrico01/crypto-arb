@@ -26,7 +26,7 @@ const cycleLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             timestamp: GetTimestamp,
-            level: "debug"
+            level: "info"
         }),
         new (winston.transports.File)({
             json: false,
