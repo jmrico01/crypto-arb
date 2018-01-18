@@ -442,7 +442,7 @@ function CalcCycleDepthBudget(cycle, depth)
     var linkTotal = [ 1.00, 0.00, 0.0 ];
     var depthBudget = Number.POSITIVE_INFINITY;
     for (var i = 0; i < cycle.length; i++) {
-        var link = [cycle[i]][cycle[(i+1) % cycle.length]];
+        var link = links[cycle[i]][cycle[(i+1) % cycle.length]];
         if (link === null) {
             console.log("WARNING: depth budget failed, possibly missing data");
             return null;
@@ -543,22 +543,14 @@ function HandleInstantCycles(cycles)
                     + minTradeOut.toFixed(2) + " USD ("
                     + (100.0 * minTradeProfit).toFixed(4) + "%)");
                 
-                // Profit is not possible from this cycle
-                if (minTradeProfit > 1.0) {
+                if (minTradeProfit > 1.0
+                && minTradeProfit > maxMinTradeProfit) {
                     maxMinTradeProfit = minTradeProfit;
                     maxMinTradeOut = minTradeOut;
                     maxMinTrade = minTrade;
                     maxCycle = cycle;
-                    // TODO temporary
-                    continue;
                 }
                 else {
-                    if (cycle[0].split("-")[0] === "CEX") {
-                    maxMinTradeProfit = minTradeProfit;
-                    maxMinTradeOut = minTradeOut;
-                    maxMinTrade = minTrade;
-                    maxCycle = cycle;
-                    }
                     continue;
                 }
             }
@@ -621,7 +613,7 @@ function AnalyzeProfitCycles()
         }
     }
 
-    /*{ // TEST
+    { // TEST
         var cycle;
         var profit;
 
@@ -644,7 +636,7 @@ function AnalyzeProfitCycles()
         //    instantCycles.push(
         //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
         //}
-    }*/
+    }
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;
