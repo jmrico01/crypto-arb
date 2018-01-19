@@ -285,6 +285,7 @@ function Trade(site, curr1, curr2, curr1Amount, callback)
             + pair[0] + "-" + pair[1] + " for " + price);
 
         // TEST
+        // In reality: place an <action> order for pair, price, amount
         sites[site].module.GetBalance(function(ignore) {
             // dummy API call for rate limit and stuff
             cycleLog.info("Order executed (DUMMY)!!")
@@ -293,18 +294,21 @@ function Trade(site, curr1, curr2, curr1Amount, callback)
                 var newBalance = JSON.parse(JSON.stringify(balance[site]));
                 if (action === "buy") {
                     newBalance[curr1] = parseFloat(newBalance[curr1])
-                        - amount * price * (1.0 - exchangeFee[0]);
-                    newBalance[curr2] = parseFloat(newBalance[curr2]) + amount;
+                        - amount * price * (1.0 + exchangeFee[0]);
+                    newBalance[curr2] = parseFloat(newBalance[curr2])
+                        + amount * (1.0 - exchangeFee[0]);
                 }
                 else {
-                    newBalance[curr1] = parseFloat(newBalance[curr1]) - amount;
+                    newBalance[curr1] = parseFloat(newBalance[curr1])
+                        - amount;
                     newBalance[curr2] = parseFloat(newBalance[curr2])
-                        + amount * price;
+                        + amount * price * (1.0 - exchangeFee[0]);
                 }
+                newBalance[curr1] = newBalance[curr1].toString();
+                newBalance[curr2] = newBalance[curr2].toString();
                 var curr2Delta = parseFloat(newBalance[curr2])
                     - parseFloat(balance[site][curr2]);
                 balance[site] = newBalance
-                cycleLog.info(balance[site]);
                 cycleLog.info("made " + curr2Delta + " " + curr2);
                 callback(curr2Delta);
             });
@@ -333,7 +337,7 @@ function Trade(site, curr1, curr2, curr1Amount, callback)
 function TradeCycleRecursive(site, cycle, invest, i, callback)
 {
     if (i >= cycle.length) {
-        callback();
+        callback(invest);
         return;
     }
 
@@ -354,9 +358,9 @@ function ExecuteCycle(cycle, invest, callback)
     cycleLog.info("Executing cycle with investment " + invest);
 
     var site = cycle[0].split("-")[0];
-    TradeCycleRecursive(site, cycle, invest, 0, function() {
+    TradeCycleRecursive(site, cycle, invest, 0, function(output) {
         executingCycle = false;
-        callback();
+        callback(output);
     });
 }
 
@@ -539,6 +543,8 @@ function HandleInstantCycles(cycles)
             }
             else {
                 var minTradeProfit = minTradeOut / minTrade;
+                // TODO remove
+                minTradeProfit = 1.01;
                 cycleLog.verbose("   Minimum trade output: "
                     + minTradeOut.toFixed(2) + " USD ("
                     + (100.0 * minTradeProfit).toFixed(4) + "%)");
@@ -594,9 +600,20 @@ function HandleInstantCycles(cycles)
             cycleLog.info("minTradeOut:     " + maxMinTradeOut + " USD"
                 + " ( " + (100.0 * maxMinTradeProfit).toFixed(4) + " % )");
             if (site === "CEX") {
-                ExecuteCycle(maxCycle, maxMinTrade, function() {
+                ExecuteCycle(maxCycle, maxMinTrade, function(output) {
                     cycleLog.info("DONE! With " + site + " balance:");
                     cycleLog.info(balance);
+                    cycleLog.info("==> Invested " + maxMinTrade.toFixed(2)
+                        + " USD");
+                    cycleLog.info("    Made " + output.toFixed(2) + " USD ("
+                        + (100.0 * (output-maxMinTrade)/maxMinTrade).toFixed(4)
+                        + " % )");
+                    if (output - maxMinTrade > 0.01) {
+                        cycleLog.info("-> THAT'S A PROFIT ! :)");
+                    }
+                    else if (output - maxMinTrade < -0.01) {
+                        cycleLog.info("-> THAT'S A LOSS ! :(");
+                    }
                 });
             }
         }

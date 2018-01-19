@@ -482,7 +482,7 @@ function GenerateIncreasingNonce()
     // Set the nonce to the number of milliseconds
     // that have passed since the reference date below.
     // This will always increase if called at > 1ms intervals.
-    var refDate = new Date("December 1, 2017");
+    var refDate = new Date("November 30, 2017");
     var nonce = Math.floor(Date.now() - refDate.getTime());
 
     return nonce;
