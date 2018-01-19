@@ -650,7 +650,7 @@ function HandleInstantCycles(cycles)
         // (probably make this higher later)
         cycleLog.info("===== LEGIT CYCLE =====");
         if (!IsCycleProfitable(maxCycleInfo)) {
-            cycleInfo.info("==> ERROR: Cycle actually isn't profitable");
+            cycleLog.info("==> ERROR: Cycle actually isn't profitable");
             return;
         }
         cycleLog.info(maxCycleInfo.cycle);
