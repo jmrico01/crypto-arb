@@ -48,7 +48,7 @@ const sites = {
         }
     },
     "Poloniex": {
-        enabled: false,
+        enabled: true,
         module: poloniex,
         entryParser: function(entry) {
             return entry;

@@ -706,6 +706,7 @@ function HandleInstantCycles(cycles)
 
 function AnalyzeProfitCycles()
 {
+    //console.log((Date.now() / 1000.0).toFixed(0) + ": analyze profit cycles");
     var instantCycles = [];
     for (var i = 0; i < profitCycles.length; i++) {
         if (profitCycles[i][0][2] === 0.0) {
@@ -716,7 +717,7 @@ function AnalyzeProfitCycles()
         }
     }
 
-    { // TEST
+    /*{ // TEST
         var cycle;
         var profit;
 
@@ -739,7 +740,7 @@ function AnalyzeProfitCycles()
         //    instantCycles.push(
         //        ['CEX-BTC', 'CEX-XRP', 'CEX-EUR', 'CEX-BCH']);
         //}
-    }
+    }*/
     if (instantCycles.length > 0) {
         var date = new Date(Date.now());
         var oldLog = console.log;

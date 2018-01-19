@@ -119,6 +119,18 @@ function CreateConnection()
         ClearData();
     }
 
+    function Rebuild(pair)
+    {
+        var orderBookUnsub = {
+            "e": "order-book-unsubscribe",
+            "data": {
+                "pair": pair.split("-")
+            },
+            "oid": "0"
+        };
+        WebSocketSend(orderBookUnsub);
+    }
+
     function AddMarketData(data)
     {
         var pair = data.pair.replace(":", "-");
@@ -127,7 +139,8 @@ function CreateConnection()
         receivedIDs[pair].push(data.id);
         receivedIDs[pair].sort();
         if (receivedIDs[pair].length > RECEIVED_IDS_MAX) {
-            receivedIDs[pair] = receivedIDs[pair].slice(1, RECEIVED_IDS_MAX + 1);
+            receivedIDs[pair] =
+                receivedIDs[pair].slice(1, RECEIVED_IDS_MAX + 1);
         }
         if (receivedIDs[pair].length === RECEIVED_IDS_MAX) {
             if (receivedIDs[pair][1] - receivedIDs[pair][0] !== 1) {
@@ -171,18 +184,6 @@ function CreateConnection()
         }
 
         lastMarketUpdate[pair] = Date.now();
-    }
-
-    function Rebuild(pair)
-    {
-        var orderBookUnsub = {
-            "e": "order-book-unsubscribe",
-            "data": {
-                "pair": pair.split("-")
-            },
-            "oid": "0"
-        };
-        WebSocketSend(orderBookUnsub);
     }
     
     function HandleOrderBookSubscribe(msg)
@@ -403,6 +404,7 @@ function CreateConnection()
         }
     });
     ws.on("close", function(code, reason) {
+        Close();
         Print("connection closed, code " + code);
         Print(reason);
         if (serverDown) {
