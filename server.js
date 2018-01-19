@@ -70,7 +70,7 @@ const sites = {
     }
 };
 
-// Start site modules, which pull in data from each API
+// Function to start site modules, which will pull data from their APIs
 var siteNames = Object.keys(sites);
 function StartSiteRecursive(idx, callback)
 {
@@ -156,11 +156,6 @@ https.get(coinMarketCapTicker, function(res) {
         
         StartSiteRecursive(0, function() {
             console.log("All sites started");
-        
-            // Start the analyzer
-            //analyzer.Start(sites, pairs);
-            
-            // Start analyzer v2
             profits.Start(sites);
         });
     });
