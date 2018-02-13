@@ -18,7 +18,10 @@
 #define LINK_BUF_LEN 128
 #define LINK_FIELDS 3
 
-typedef unsigned int uint;
+enum ReadMode {
+    READMODE_NORMAL,
+    READMODE_STRUCTURE
+};
 
 std::vector<double> timeStart(10, 0.0);
 static double Time(int id)
@@ -43,6 +46,9 @@ static Link CalcPathProfit(const std::vector<int>& path, const Link** links)
     Link profit = { 1.0, 0.00, 0.0 };
     for (int i = 1; i < (int)path.size(); i++) {
         Link link = links[path[i-1]][path[i]];
+        if (link.frac == 0.0) {
+            return { 0.0, 0.00, 0.0 };
+        }
         profit.frac *= link.frac;
         profit.flat = profit.flat * link.frac + link.flat;
         profit.time += link.time;
@@ -162,6 +168,9 @@ static Link CalcCycleProfit(const Link** links, int* path, int pathLen)
     Link profit = { 1.0, 0.00, 0.0 };
     for (int i = 1; i < pathLen; i++) {
         Link link = links[path[i-1]][path[i]];
+        if (link.frac == 0.0) {
+            return { 0.0, 0.00, 0.0 };
+        }
         profit.frac *= link.frac;
         profit.flat = profit.flat * link.frac + link.flat;
         profit.time += link.time;
@@ -175,26 +184,33 @@ static Link CalcCycleProfit(const Link** links, int* path, int pathLen)
     return profit;
 }
 
-int totalCycles = 0;
-void RecordCycle(
-    const Link** links, int* path, int pathLen,
-    std::vector<Path>& cycles)
+void RecordAnyCycle(
+    const char** nodes, const Link** links,
+    int* path, int pathLen,
+    FILE* outFile, std::vector<std::vector<int>>& cycles)
 {
-    Link profit = CalcCycleProfit(links, path, pathLen);
-    // TODO only writing immediate cycles for now
-    if (profit.frac > 1.0 && profit.time == 0.0) {
-        std::vector<int> cycle(pathLen);
-        for (int i = 0; i < pathLen; i++) {
-            cycle[i] = path[i];
-        }
-        cycles.push_back({ profit, cycle });
+    static bool first = true;
+
+    if (first) {
+        first = false;
     }
-    totalCycles++;
+    else {
+        fprintf(outFile, ",\n");
+    }
+    fprintf(outFile, "    [ ");
+    for (int i = 0; i < pathLen; i++) {
+        fprintf(outFile, "\"%s\"", nodes[path[i]]);
+        if (i != pathLen - 1) {
+            fprintf(outFile, ", ");
+        }
+    }
+    fprintf(outFile, " ]");
 }
 
 static void FindProfitCycles(
-    int numNodes, const Link** links,
-    std::vector<Path>& cycles)
+    int numNodes, const char** nodes, const Link** links,
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc)
 {
     // Alternate representation of links
     int** neighbors = (int**)malloc(numNodes * sizeof(int*));
@@ -212,16 +228,12 @@ static void FindProfitCycles(
         }
     }
 
-    FindUniqueCyclesTarjan(numNodes, links, neighbors, cycles);
-    //FindUniqueCyclesTiernan(numNodes, links, neighbors, cycles);
+    FindUniqueCyclesTarjan(numNodes, nodes, links, neighbors,
+        outFile, cycles, recordCycleFunc);
+    /*FindUniqueCyclesTiernan(numNodes, links, neighbors,
+        cycles, recordCycleFunc);*/
 
-    std::sort(cycles.begin(), cycles.end(), ComparePaths);
-
-    /*for (int i = 0; i < (int)cycles.size(); i++) {
-        if (cycles[i].profit.time == 0.0) {
-            printf("OMG INSTANT PROFIT!\n");
-        }
-    }*/
+    //std::sort(cycles.begin(), cycles.end(), ComparePaths);
 
     for (int i = 0; i < numNodes; i++) {
         free(neighbors[i]);
@@ -230,6 +242,27 @@ static void FindProfitCycles(
 }
 
 static void WritePaths(
+    FILE* outFile, char** nodes,
+    const std::vector<std::vector<int>>& paths, int k)
+{
+    fprintf(outFile, "[\n");
+    for (int i = 0; i < k; i++) {
+        fprintf(outFile, "    [ ");
+        for (int j = 0; j < (int)paths[i].size(); j++) {
+            fprintf(outFile, "\"%s\"", nodes[paths[i][j]]);
+            if (j != (int)paths[i].size() - 1) {
+                fprintf(outFile, ", ");
+            }
+        }
+        fprintf(outFile, " ]");
+        if (i != k - 1) {
+            fprintf(outFile, ",");
+        }
+        fprintf(outFile, "\n");
+    }
+    fprintf(outFile, "]");
+}
+static void WriteProfitPaths(
     FILE* outFile, char** nodes,
     const std::vector<Path>& paths, int k)
 {
@@ -365,7 +398,8 @@ static bool ParseLink(char* buf, Link* link)
     return true;
 }
 
-static bool ParseLinks(Link** links, int numNodes, FILE* file, char* buf)
+static bool ParseLinks(Link** links, int numNodes,
+    FILE* file, char* buf, ReadMode readMode)
 {
     char linkBuf[LINK_BUF_LEN];
 
@@ -388,6 +422,9 @@ static bool ParseLinks(Link** links, int numNodes, FILE* file, char* buf)
                 if (!ParseLink(linkBuf, &links[i][link])) {
                     fprintf(stderr, "ParseLink failed (%d, node %d)", link, i);
                     return false;
+                }
+                if (readMode == READMODE_STRUCTURE) {
+                    links[i][link].frac = 1.0f;
                 }
             }
             else if (buf[iBuf] == ',' || buf[iBuf] == '\0') {
@@ -445,6 +482,11 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Expected 4 arguments: %s",
             "inFile, pathsFile, cyclesFile, mode (instant_cycles/...)");
         return 1;
+    }
+
+    ReadMode readMode = READMODE_NORMAL;
+    if (strncmp(argv[4], "instant_cycles", 64) == 0) {
+        readMode = READMODE_STRUCTURE;
     }
 
     //printf("reading graph\n");
@@ -532,7 +574,7 @@ int main(int argc, char* argv[])
     }
 
     // Read links
-    if (!ParseLinks(links, numNodes, file, buf)) {
+    if (!ParseLinks(links, numNodes, file, buf, readMode)) {
         Cleanup(file, numSites, sites, numNodes, nodes, links);
         return 0;
     }
@@ -544,16 +586,21 @@ int main(int argc, char* argv[])
     for (int i = 0; i < numSites; i++) {
         printf("%s, ", sites[i]);
     }
+    int numLinks = 0;
     printf("\n");
     for (int i = 0; i < numNodes; i++) {
         printf("%s\n", nodes[i]);
         for (int j = 0; j < numNodes; j++) {
             if (links[i][j].frac != 0.0) {
+                numLinks++;
                 printf("  %s : %f, %f, %f\n", nodes[j],
                     links[i][j].frac, links[i][j].flat, links[i][j].time);
             }
         }
-    }*/
+    }
+    printf("Total nodes: %d\n", numNodes);
+    printf("Total links: %d\n", numLinks);
+    fflush(stdout);*/
 
     //printf("starting path computations\n");
     //fflush(stdout);
@@ -564,6 +611,7 @@ int main(int argc, char* argv[])
     //printf("  paths time: %f\n", Time(0));
     //fflush(stdout);
 
+    std::vector<std::vector<int>> cycles;
     if (strncmp(argv[4], "instant_cycles", 64) == 0) {
         //printf("Instant cycles mode\n");
         for (int i = 0; i < numNodes; i++) {
@@ -573,15 +621,28 @@ int main(int argc, char* argv[])
                 }
             }
         }
+
+        FILE* outFile = fopen(argv[3], "w");
+        if (!outFile) {
+            fprintf(stderr, "Couldn't open cycles out file: %s", argv[3]);
+            Cleanup(0, numSites, sites, numNodes, nodes, links);
+            return 1;
+        }
+        fprintf(outFile, "[\n");
+        Time(0);
+        FindProfitCycles(numNodes, (const char**)nodes, (const Link**)links,
+            outFile, cycles, RecordAnyCycle);
+        printf("  cycles time: %f\n", Time(0));
+        fflush(stdout);
+        fprintf(outFile, "\n]\n");
+        fclose(outFile);
     }
     else {
         fprintf(stderr, "Invalid operation mode");
         return 1;
     }
 
-    Time(0);
-    std::vector<Path> profitCycles;
-    FindProfitCycles(numNodes, (const Link**)links, profitCycles);
+    //Time(0);
     //printf("  cycles time: %f\n", Time(0));
     //fflush(stdout);
 
@@ -592,18 +653,18 @@ int main(int argc, char* argv[])
         Cleanup(0, numSites, sites, numNodes, nodes, links);
         return 1;
     }
-    WritePaths(outFile, nodes, profitPaths, (int)profitPaths.size());
+    WriteProfitPaths(outFile, nodes, profitPaths, (int)profitPaths.size());
     fclose(outFile);
 
     // Write profit cycles
-    outFile = fopen(argv[3], "w");
+    /*outFile = fopen(argv[3], "w");
     if (!outFile) {
         fprintf(stderr, "Couldn't open cycles out file: %s", argv[3]);
         Cleanup(0, numSites, sites, numNodes, nodes, links);
         return 1;
     }
-    WritePaths(outFile, nodes, profitCycles, (int)profitCycles.size());
-    fclose(outFile);
+    WritePaths(outFile, nodes, cycles, (int)cycles.size());
+    fclose(outFile);*/
 
     Cleanup(0, numSites, sites, numNodes, nodes, links);
 

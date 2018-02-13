@@ -7,9 +7,11 @@
 #include "profit_paths.h"
 
 void FindUniqueCyclesTarjan(
-    int numNodes, const Link** links, int** neighbors,
-    std::vector<Path>& cycles);
+    int numNodes, const char** nodes, const Link** links, int** neighbors,
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc);
 
 void FindUniqueCyclesTiernan(
-    int numNodes, const Link** links, int** neighbors,
-    std::vector<Path>& cycles);
+    int numNodes, const char** nodes, const Link** links, int** neighbors,
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc);

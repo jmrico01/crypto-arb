@@ -3,11 +3,12 @@
 #include <stdlib.h>
 
 static bool TarjanBacktrack(
-    int numNodes, const Link** links, int** neighbors,
+    int numNodes, const char** nodes, const Link** links, int** neighbors,
     int* path, bool* marked, int* markedStack,
     int* kPath, int* kMarked,
     int v,
-    std::vector<Path>& cycles)
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc)
 {
     bool f = false;
     path[*kPath] = v;
@@ -29,13 +30,13 @@ static bool TarjanBacktrack(
             //neighbors[v][count - 1] = -2;
         }
         else if (w == path[0]) {
-            RecordCycle(links, path, *kPath, cycles);
+            recordCycleFunc(nodes, links, path, *kPath, outFile, cycles);
             f = true;
         }
         else if (!marked[w]) {
-            f = TarjanBacktrack(numNodes, links, neighbors,
+            f = TarjanBacktrack(numNodes, nodes, links, neighbors,
                 path, marked, markedStack, kPath, kMarked,
-                w, cycles) || f;
+                w, outFile, cycles, recordCycleFunc) || f;
         }
     }
 
@@ -60,8 +61,9 @@ static bool TarjanBacktrack(
  * https://ecommons.cornell.edu/handle/1813/5941
  */
 void FindUniqueCyclesTarjan(
-    int numNodes, const Link** links, int** neighbors,
-    std::vector<Path>& cycles)
+    int numNodes, const char** nodes, const Link** links, int** neighbors,
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc)
 {
     int* path = (int*)malloc(numNodes * sizeof(int));
     int kPath = 0;
@@ -73,9 +75,11 @@ void FindUniqueCyclesTarjan(
     }
 
     for (int s = 0; s < numNodes; s++) {
-        TarjanBacktrack(numNodes, links, neighbors,
+        //printf("step %d\n", s);
+        //fflush(stdout);
+        TarjanBacktrack(numNodes, nodes, links, neighbors,
             path, marked, markedStack, &kPath, &kMarked,
-            s, cycles);
+            s, outFile, cycles, recordCycleFunc);
         while (kMarked > 0) {
             int u = markedStack[--kMarked];
             marked[u] = false;
@@ -94,8 +98,9 @@ void FindUniqueCyclesTarjan(
  * http://citeseerx.ist.psu.edu/viewadoc/download?doi=10.1.1.516.9454&rep=rep1&type=pdf
  */
 void FindUniqueCyclesTiernan(
-    int numNodes, const Link** links, int** neighbors,
-    std::vector<Path>& cycles)
+    int numNodes, const char** nodes, const Link** links, int** neighbors,
+    FILE* outFile, std::vector<std::vector<int>>& cycles,
+    RecordCycleFunc recordCycleFunc)
 {
     int* path = (int*)malloc(numNodes * sizeof(int));
     bool** closed = (bool**)malloc(numNodes * sizeof(bool*));
@@ -151,7 +156,7 @@ void FindUniqueCyclesTiernan(
 
         // Circuit confirmation
         if (links[path[k]][path[0]].frac != 0.0) {
-            RecordCycle(links, path, k + 1, cycles);
+            recordCycleFunc(nodes, links, path, k + 1, outFile, cycles);
         }
 
         // Vertex closure

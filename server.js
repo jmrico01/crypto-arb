@@ -14,6 +14,8 @@ const quoine = require("./sites/quoine");
 const analyzer = require("./analyzer");
 const profits = require("./profits");
 
+console.log("========== INITIALIZING CRYPTO-ARBITRAGE ==========");
+
 const sites = {
     "Bitstamp": {
         enabled: true,
@@ -126,7 +128,7 @@ var currencies = {
 const coinMarketCapTicker = "https://api.coinmarketcap.com/v1/ticker/?limit=0";
 https.get(coinMarketCapTicker, function(res) {
     if (res.statusCode !== 200) {
-        Print("CoinMarketCap ticker returned " + res.statusCode);
+        console.log("CoinMarketCap ticker returned " + res.statusCode);
         return;
     }
 
@@ -140,7 +142,7 @@ https.get(coinMarketCapTicker, function(res) {
             data = JSON.parse(data);
         }
         catch (err) {
-            Print("CoinMarketCap ticker JSON parse error " + err);
+            console.log("CoinMarketCap ticker JSON parse error " + err);
             return;
         }
 
@@ -165,6 +167,11 @@ app.set("port", 8080);
 app.use(express.static(path.join(__dirname, "public")));
 app.listen(app.get("port"));
 
+// Serve complete list of currencies
+app.get("/currencies", function(req, res) {
+    res.send(currencies);
+});
+
 // Serve enabled sites
 app.get("/enabledSites", function(req, res) {
     var enabledSites = [];
@@ -175,7 +182,6 @@ app.get("/enabledSites", function(req, res) {
     }
     res.send(enabledSites);
 });
-
 // Serve enabled pairs for the given site
 app.get("/enabledPairs", function(req, res) {
     var site = req.query.site;
@@ -189,11 +195,7 @@ app.get("/enabledPairs", function(req, res) {
         return;
     }
 
-    var enabledPairs = [];
-    for (var pair in sites[site].module.data) {
-        enabledPairs.push(pair);
-    }
-    res.send(enabledPairs);
+    res.send(Object.keys(sites[site].module.data));
 });
 
 // Serve market depth data

@@ -15,9 +15,10 @@ const Queue = require("./queue");
 // See server.js "sites" variable
 var sites = {};
 
-var nodes = {};
+var nodes = [];
 var links = {};
 
+var instantCycles = [];
 var profitCycles = [];
 
 function IsFiat(currency)
@@ -673,7 +674,8 @@ function HandleInstantCycles(cycles)
             + (maxCycleInfo.depth1Out - maxCycleInfo.depth1).toFixed(2));
         
         if (maxCycleInfo.minTrade > USD_MAX_INVEST) {
-            maxCycleInfo.minTrade = USD_MAX_INVEST;
+            return;
+            //maxCycleInfo.minTrade = USD_MAX_INVEST;
         }
         var site = maxCycleInfo.cycle[0].split("-")[0];
         if (site === "CEX") {
@@ -759,7 +761,7 @@ function WriteProfitGraph(filePath, callback)
 {
     var dataStr = "";
 
-    // Write nodes
+    // Write sites
     var siteArray = Object.keys(sites);
     var numSites = 0;
     for (var i = 0; i < siteArray.length; i++) {
@@ -775,25 +777,21 @@ function WriteProfitGraph(filePath, callback)
     }
     dataStr = dataStr.substring(0, dataStr.length - 1) + "\n";
 
-    var nodeArray = Object.keys(nodes);
-    dataStr += nodeArray.length.toString() + "\n";
-    for (var i = 0; i < nodeArray.length; i++) {
-        dataStr += nodeArray[i] + ",";
+    // Write nodes
+    dataStr += nodes.length.toString() + "\n";
+    for (var i = 0; i < nodes.length; i++) {
+        dataStr += nodes[i] + ",";
     }
     dataStr = dataStr.substring(0, dataStr.length - 1) + "\n";
 
     // Write links
-    for (var i = 0; i < nodeArray.length; i++) {
-        for (var j = 0; j < nodeArray.length; j++) {
-            if (links.hasOwnProperty(nodeArray[i])) {
-                if (links[nodeArray[i]].hasOwnProperty(nodeArray[j])) {
-                    if (links[nodeArray[i]][nodeArray[j]] !== null) {
-                        dataStr += 
-                            "["
-                            + links[nodeArray[i]][nodeArray[j]].toString()
-                            + "]";
-                    }
-                }
+    for (var i = 0; i < nodes.length; i++) {
+        for (var j = 0; j < nodes.length; j++) {
+            if (links[nodes[i]][nodes[j]] !== null) {
+                dataStr += 
+                    "["
+                    + links[nodes[i]][nodes[j]].toString()
+                    + "]";
             }
             dataStr += ",";
         }
@@ -809,7 +807,10 @@ function UpdateExchangeLinks()
 {
     for (var node1 in links) {
         for (var node2 in links[node1]) {
-            // Link node1 -> node2
+            if (links[node1][node2] === null) {
+                continue;
+            }
+            
             var site = node1.split("-")[0];
             var curr1 = node1.split("-")[1];
             var curr2 = node2.split("-")[1];
@@ -817,6 +818,13 @@ function UpdateExchangeLinks()
             if (site !== node2.split("-")[0]) {
                 continue;
             }
+            if (!SiteExchangesPair(site, curr1, curr2)) {
+                continue;
+            }
+            if (fees.Exchange(site, curr1, curr2) === null) {
+                continue;
+            }
+
             var pair = CurrenciesToPair(site, curr1, curr2);
             if (sites[site].module.data[pair].asks.length() === 0
             || sites[site].module.data[pair].bids.length() === 0) {
@@ -825,7 +833,6 @@ function UpdateExchangeLinks()
 
             var exchangeRate = GetExchangeRate(site, curr1, curr2);
             var feeExchange = fees.Exchange(site, curr1, curr2);
-
             links[node1][node2] = [
                 exchangeRate * (1.0 - feeExchange[0]),
                 feeExchange[1],
@@ -858,45 +865,48 @@ function Start(sitesIn)
 
         for (var i = 0; i < currencies.length; i++) {
             var nodeName = site + "-" + currencies[i];
-            nodes[nodeName] = [];
+            nodes.push(nodeName);
         }
     }
 
     // Create links
-    for (var node1 in nodes) {
-        for (var node2 in nodes) {
-            if (node1 === node2) {
-                continue;
+    for (var i = 0; i < nodes.length; i++) {
+        for (var j = 0; j < nodes.length; j++) {
+            // Link nodes[i] -> nodes[j]
+            var node1 = nodes[i];
+            var node2 = nodes[j];
+            if (!links.hasOwnProperty(node1)) {
+                links[node1] = {};
             }
-            
-            // Link node1 -> node2
+            links[node1][node2] = null;
+
             var site1 = node1.split("-")[0];
             var curr1 = node1.split("-")[1];
             var site2 = node2.split("-")[0];
             var curr2 = node2.split("-")[1];
 
-            var link = [0.0, 0.00, 0.0];
+            var link = [ 0.0, 0.00, 0.0 ];
             if (site1 === site2) {
                 if (curr1 === curr2) {
-                    console.assert(false, "Duplicate node");
-                }
-
-                if (!SiteExchangesPair(site1, curr1, curr2)) {
                     continue;
                 }
-                if (fees.Exchange(site1, curr1, curr2) === null) {
-                    continue;
+                else {
+                    if (!SiteExchangesPair(site1, curr1, curr2)) {
+                        continue;
+                    }
+                    if (fees.Exchange(site1, curr1, curr2) === null) {
+                        continue;
+                    }
+                    // Exchange links are updated separately, since they
+                    // depend on the exchange rates.
+                    // Initialize the link to 0-profit.
+                    link = [1.0, 0.00, 0.0];
                 }
-                // Exchange links are updated separately, since they
-                // depend on the exchange rates.
-                // Initialize the link to null for now.
-                link = null;
             }
             else if (curr1 === curr2) {
                 if (IsFiat(curr1)) {
                     // Only analyze transfer of cryptocurrencies.
-                    // Fiat transfer is left for the first and last steps
-                    // of the arbitrage process.
+                    // Fiat transfer has to go through a bank.
                     continue;
                 }
                 var feeWithdraw1 = fees.Withdraw(site1, curr1);
@@ -916,9 +926,6 @@ function Start(sitesIn)
                 continue;
             }
 
-            if (!links.hasOwnProperty(node1)) {
-                links[node1] = {};
-            }
             links[node1][node2] = link;
         }
     }
@@ -946,11 +953,16 @@ function Start(sitesIn)
         "CEX": "card",
         "Kraken": "wire"
     };
-    nodes["BofA-USD"] = [];
+    nodes.push("BofA-USD");
     links["BofA-USD"] = {};
-    for (var i = 0; i < depositNodes.length; i++) {
-        var site = depositNodes[i].split("-")[0];
-        var curr = depositNodes[i].split("-")[1];
+    for (var i = 0; i < nodes.length; i++) {
+        links["BofA-USD"][nodes[i]] = null;
+        if (depositNodes.indexOf(nodes[i]) === -1) {
+            continue;
+        }
+
+        var site = nodes[i].split("-")[0];
+        var curr = nodes[i].split("-")[1];
         if (!sites[site].enabled) {
             continue;
         }
@@ -964,15 +976,20 @@ function Start(sitesIn)
         }
         var feeDeposit = fees.Deposit(site, curr);
 
-        links["BofA-USD"][depositNodes[i]] = [
+        links["BofA-USD"][nodes[i]] = [
             (1.0 - feeWithdraw[0]) * (1.0 - feeDeposit[0]),
             feeWithdraw[1] * (1.0 - feeDeposit[0]),
             60.0 * 60.0 * 24.0 * 7.0 // one week
         ];
     }
-    for (var i = 0; i < withdrawNodes.length; i++) {
-        var site = withdrawNodes[i].split("-")[0];
-        var curr = withdrawNodes[i].split("-")[1];
+    for (var i = 0; i < nodes.length; i++) {
+        links[nodes[i]]["BofA-USD"] = null;
+        if (withdrawNodes.indexOf(nodes[i]) === -1) {
+            continue;
+        }
+
+        var site = nodes[i].split("-")[0];
+        var curr = nodes[i].split("-")[1];
         if (!sites[site].enabled) {
             continue;
         }
@@ -981,39 +998,52 @@ function Start(sitesIn)
         // unclear whether there will be deposit fees here
         var feeDeposit = [0.0, 0.00];
 
-        if (!links.hasOwnProperty(withdrawNodes[i])) {
-            links[withdrawNodes[i]] = {};
-        }
-        links[withdrawNodes[i]]["BofA-USD"] = [
+        links[nodes[i]]["BofA-USD"] = [
             (1.0 - feeWithdraw[0]) * (1.0 - feeDeposit[0]),
             feeWithdraw[1] * (1.0 - feeDeposit[0]),
             60.0 * 60.0 * 24.0 * 7.0 // one week
         ];
     }
 
-    var nNodes = Object.keys(nodes).length;
-    var nLinks = 0;
+    // Ensure all links are set to a correct value or null.
     for (var n1 in links) {
-        for (var n2 in links) {
-            nLinks++;
+        for (var n2 in links[n1]) {
+            var link = links[n1][n2];
+            if (link === null) {
+                continue;
+            }
+            if (Array.isArray(link)) {
+                if (link.length === 3) {
+                    continue;
+                }
+            }
+
+            console.assert(false, "Invalid link: "
+                + n1 + " -> " + n2 + ", value " + link);
         }
     }
-    console.log("profits graph created");
-    console.log("  nodes: " + nNodes);
-    console.log("  links: " + nLinks);
+    var nLinks = 0;
+    for (var n1 in links) {
+        for (var n2 in links[n1]) {
+            if (links[n1][n2] !== null) {
+                nLinks++;
+            }
+        }
+    }
+    console.log("Profits graph created");
+    console.log("  Nodes: " + nodes.length);
+    console.log("  Links: " + nLinks);
 
     setInterval(UpdateExchangeLinks, UPDATE_TIME * 1000);
 
-    var lastWritten = Date.now();
-    function WriteGraphCallback(err)
-    {
+    console.log("Computing instant cycles");
+    WriteProfitGraph(PROFIT_GRAPH_FILE, function(err) {
         if (err) {
             console.log("Error writing profit graph");
             console.log(err);
             return;
         }
 
-        //cycleLog.verbose("CPP started");
         const profitPathsProc = childProcess.spawn(
             PROFIT_PATHS_PROGRAM,
             [
@@ -1030,7 +1060,6 @@ function Start(sitesIn)
             console.log(data.toString());
         });
         profitPathsProc.on("close", function(code) {
-            //cycleLog.verbose("CPP done");
             if (code !== 0) {
                 console.log("profit paths process exited with code " + code);
             }
@@ -1041,31 +1070,17 @@ function Start(sitesIn)
                 }
 
                 try {
-                    profitCycles = JSON.parse(data);
+                    instantCycles = JSON.parse(data);
                 }
                 catch (err) {
                     console.log("Error parsing profit cycles: " + err);
                     return;
                 }
 
-                //cycleLog.verbose("Analyzing profit cycles");
-                AnalyzeProfitCycles();
-                var elapsed = Date.now() - lastWritten;
-                lastWritten = Date.now();
-                var wait = 0;
-                if (elapsed < MIN_WRITE_TIME * 1000.0) {
-                    wait = MIN_WRITE_TIME * 1000.0 - elapsed;
-                }
-                //console.log("elapsed: " + elapsed);
-                //console.log("wait: " + wait);
-                setTimeout(function() {
-                    //console.log("write graph");
-                    WriteProfitGraph(PROFIT_GRAPH_FILE, WriteGraphCallback);
-                }, wait);
+                console.log("Done: " + instantCycles.length + " instant cycles");
             });
         });
-    }
-    WriteProfitGraph(PROFIT_GRAPH_FILE, WriteGraphCallback);
+    });
 
     sites["CEX"].module.GetBalance(function(b) {
         balance["CEX"] = b;

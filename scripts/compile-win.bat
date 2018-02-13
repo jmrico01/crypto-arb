@@ -5,7 +5,7 @@ if %ERRORLEVEL% NEQ 0 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\
 
 set DEFINES=/D_CRT_SECURE_NO_WARNINGS
 set FLAGS=/nologo /Gm- /GR- /EHa- /EHsc /Ox
-set WARNING_FLAGS=/WX /W4 /wd4702 /wd4505
+set WARNING_FLAGS=/WX /W4 /wd4702 /wd4505 /wd4100
 
 pushd build
 

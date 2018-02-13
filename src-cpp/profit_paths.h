@@ -13,6 +13,7 @@ struct Path {
     std::vector<int> path;
 };
 
-void RecordCycle(
-    const Link** links, int* path, int pathLen,
-    std::vector<Path>& cycles);
+typedef void (*RecordCycleFunc)(
+    const char** nodes, const Link** links,
+    int* path, int pathLen,
+    FILE* outFile, std::vector<std::vector<int>>& cycles);
