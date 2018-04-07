@@ -91,6 +91,7 @@ static bool PathContainsNode(const std::vector<int>& path, int node)
 }*/
 
 // VERY inefficient
+#if 0
 static void FindProfitPaths(
     int numNodes, int src, int dst, const Link** links,
     std::vector<Path>& profitPaths)
@@ -162,8 +163,9 @@ static void FindProfitPaths(
     std::sort(profitPaths.begin(), profitPaths.end(), ComparePaths);
     //printf("paths: %d\nfinal: %d\n", paths.size(), profitPaths.size());
 }
+#endif
 
-static Link CalcCycleProfit(const Link** links, int* path, int pathLen)
+/*static Link CalcCycleProfit(const Link** links, int* path, int pathLen)
 {
     Link profit = { 1.0, 0.00, 0.0 };
     for (int i = 1; i < pathLen; i++) {
@@ -182,7 +184,7 @@ static Link CalcCycleProfit(const Link** links, int* path, int pathLen)
     profit.time += link.time;
 
     return profit;
-}
+}*/
 
 void RecordAnyCycle(
     const char** nodes, const Link** links,
@@ -241,7 +243,7 @@ static void FindProfitCycles(
     free(neighbors);
 }
 
-static void WritePaths(
+/*static void WritePaths(
     FILE* outFile, char** nodes,
     const std::vector<std::vector<int>>& paths, int k)
 {
@@ -261,7 +263,7 @@ static void WritePaths(
         fprintf(outFile, "\n");
     }
     fprintf(outFile, "]");
-}
+}*/
 static void WriteProfitPaths(
     FILE* outFile, char** nodes,
     const std::vector<Path>& paths, int k)
